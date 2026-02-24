@@ -125,7 +125,9 @@ export default function Home() {
   const handleLogout = () => {
       setCurrentUser("");
       setTempInput("");
-      setCurrentView("inbox"); // FIX: Force view back to inbox when logging out
+      setCurrentView("inbox"); 
+      setSelectedEmail(null); 
+      setSelectedIds([]);   
       window.history.pushState(null, '', `/`);
   };
 
