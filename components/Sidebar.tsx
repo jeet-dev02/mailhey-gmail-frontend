@@ -7,9 +7,10 @@ interface SidebarProps {
     toggleSidebar: () => void;
     currentView: string;
     setCurrentView: (view: string) => void;
+    onLogoClick?: () => void;
 }
 
-export default function Sidebar({ isOpen, toggleSidebar, currentView, setCurrentView }: SidebarProps) {
+export default function Sidebar({ isOpen, toggleSidebar, currentView, setCurrentView, onLogoClick }: SidebarProps) {
     
     const getNavClass = (viewName: string) => {
         const isActive = currentView === viewName;
@@ -28,7 +29,11 @@ export default function Sidebar({ isOpen, toggleSidebar, currentView, setCurrent
                     <Menu size={20} className="text-[#444746] dark:text-gray-300" />
                 </button>
                 {isOpen && (
-                    <div className="text-[24px] font-bold tracking-tight text-indigo-600 select-none whitespace-nowrap cursor-pointer" onClick={() => window.location.reload()} title="Go to Login">
+                    <div 
+                        className="text-[24px] font-bold tracking-tight text-indigo-600 select-none whitespace-nowrap cursor-pointer" 
+                        onClick={onLogoClick} 
+                        title="Go to Login"
+                    >
                         mail<span className="text-gray-600 dark:text-gray-300">hey</span>
                     </div>
                 )}

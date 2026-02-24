@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation"; 
 import { fetchEmails } from "@/lib/api";
 import { Email } from "@/lib/types";
 import Sidebar from "@/components/Sidebar"; 
@@ -8,10 +9,29 @@ import { Header } from "@/components/Header";
 import { EmailList } from "@/components/EmailList"; 
 import { EmailDetail } from "@/components/EmailDetail";
 
+const getStarOverrides = () => {
+    if (typeof window !== 'undefined') {
+        return JSON.parse(localStorage.getItem('mailhey_star_overrides') || '{}');
+    }
+    return {};
+};
+
 export default function Home() {
-  // --- STATES ---
-  const [currentUser, setCurrentUser] = useState<string>(""); 
-  const [tempInput, setTempInput] = useState("");
+  const params = useParams();
+  
+  const slug = (params?.slug as string[]) || [];
+
+  let initialUser = "";
+  if (slug[0]) {
+      const rawSlug = decodeURIComponent(slug[0]);
+      initialUser = rawSlug.includes("@") ? rawSlug : `${rawSlug}@mailhey.com`;
+  }
+  
+  const initialFolder = slug[1] || "inbox";
+  const initialEmailId = slug[2] || null;
+
+  const [currentUser, setCurrentUser] = useState<string>(initialUser); 
+  const [currentView, setCurrentView] = useState(initialFolder); 
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,11 +41,10 @@ export default function Home() {
   
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [isEmailLoading, setIsEmailLoading] = useState(false); 
-  const [currentView, setCurrentView] = useState("inbox"); 
   const [searchQuery, setSearchQuery] = useState(""); 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]); // Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [pendingDeepLink, setPendingDeepLink] = useState<string | null>(initialEmailId);
 
-  // --- EFFECTS ---
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
@@ -38,9 +57,24 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const emailToFetch = currentUser.includes("@") ? currentUser : `${currentUser}@mailhey.com`;
-      const data = await fetchEmails(emailToFetch, 1);
-      setEmails(data);
+      const data = await fetchEmails(currentUser, 1);
+      
+      const overrides = getStarOverrides();
+
+      const mergedData = data.map((email: Email) => {
+          if (overrides[email.id] !== undefined) {
+              return { ...email, starred: overrides[email.id] };
+          }
+          return email;
+      });
+
+      setEmails(mergedData);
+
+      if (pendingDeepLink) {
+          const found = mergedData.find((e: Email) => e.id === pendingDeepLink);
+          if (found) setSelectedEmail(found);
+          setPendingDeepLink(null); 
+      }
     } catch (err) {
       console.error(err);
       setError("Server is waking up. Please click Retry.");
@@ -54,27 +88,70 @@ export default function Home() {
     fetchInbox();
   }, [currentUser]);
 
-  // --- HANDLERS ---
+  // --- SAFE ROUTING HANDLERS ---
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (tempInput.trim()) {
-      setCurrentUser(tempInput.trim());
+      const input = tempInput.trim();
+      const fullEmail = input.includes("@") ? input : `${input}@mailhey.com`;
+      setCurrentUser(fullEmail);
+      setCurrentView("inbox"); // FIX: Force view to inbox on login
+      window.history.pushState(null, '', `/${fullEmail}/inbox`); 
     }
   };
 
-  const handleToggleStar = (id: string) => {
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, starred: !e.starred } : e));
-    if (selectedEmail?.id === id) {
-        setSelectedEmail(prev => prev ? { ...prev, starred: !prev.starred } : null);
-    }
+  const handleFolderChange = (view: string) => {
+      setCurrentView(view);
+      setSelectedEmail(null); 
+      setSelectedIds([]); 
+      window.history.pushState(null, '', `/${currentUser}/${view}`);
   };
 
   const handleEmailClick = (email: Email) => {
     setIsEmailLoading(true);
     setSelectedEmail(email);
+    window.history.pushState(null, '', `/${currentUser}/${currentView}/${email.id}`);
+    
     setTimeout(() => {
         setIsEmailLoading(false);
-    }, 500); // 500ms delay to show the skeleton loader
+    }, 500); 
+  };
+
+  const handleBackToInbox = () => {
+      setSelectedEmail(null);
+      window.history.pushState(null, '', `/${currentUser}/${currentView}`);
+  };
+
+  const handleLogout = () => {
+      setCurrentUser("");
+      setTempInput("");
+      setCurrentView("inbox"); // FIX: Force view back to inbox when logging out
+      window.history.pushState(null, '', `/`);
+  };
+
+  // --- ACTION HANDLERS ---
+  const [tempInput, setTempInput] = useState("");
+
+  const handleToggleStar = (id: string) => {
+    // FIX: Find the email FIRST so we know exactly what state to save
+    const targetEmail = emails.find(e => e.id === id);
+    if (!targetEmail) return;
+    
+    const newStarredState = !targetEmail.starred;
+
+    // 1. Update React State safely
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, starred: newStarredState } : e));
+
+    if (selectedEmail?.id === id) {
+        setSelectedEmail(prev => prev ? { ...prev, starred: newStarredState } : null);
+    }
+
+    // 2. Save to local storage perfectly
+    if (typeof window !== 'undefined') {
+        const overrides = getStarOverrides();
+        overrides[id] = newStarredState;
+        localStorage.setItem('mailhey_star_overrides', JSON.stringify(overrides));
+    }
   };
 
   const handleToggleSelect = (id: string) => {
@@ -85,19 +162,16 @@ export default function Home() {
 
   const handleSelectAll = () => {
     if (selectedIds.length === displayedEmails.length && displayedEmails.length > 0) {
-        setSelectedIds([]); // Deselect all
+        setSelectedIds([]); 
     } else {
-        setSelectedIds(displayedEmails.map(email => email.id)); // Select all displayed
+        setSelectedIds(displayedEmails.map(email => email.id)); 
     }
   };
 
-  // --- FILTERING LOGIC ---
   const displayedEmails = emails.filter(email => {
-    // 1. Check Folder View
     if (currentView === "starred" && !email.starred) return false;
     if (currentView === "trash") return false; 
 
-    // 2. Check Search Query (Supercharged and crash-proof)
     if (searchQuery.trim() !== "") {
         const query = searchQuery.trim().toLowerCase();
         const matchesSubject = (email.subject || "").toLowerCase().includes(query);
@@ -113,7 +187,6 @@ export default function Home() {
   const maxChars = 50;
   const remainingChars = maxChars - tempInput.length;
 
-  // --- SIGN IN SCREEN ---
   if (!currentUser) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
@@ -155,18 +228,14 @@ export default function Home() {
     );
   }
 
-  // --- MAIN APP UI ---
   return (
     <div className="flex h-screen bg-[#F6F8FC] dark:bg-gray-900 transition-colors">
       <Sidebar 
          isOpen={isSidebarOpen} 
          toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
          currentView={currentView}
-         setCurrentView={(view) => {
-             setCurrentView(view);
-             setSelectedEmail(null); 
-             setSelectedIds([]); // Clear selections when changing folders
-         }}
+         setCurrentView={handleFolderChange} 
+         onLogoClick={handleLogout} 
       />
       <div className="flex-1 flex flex-col min-w-0">
         <Header 
@@ -192,7 +261,7 @@ export default function Home() {
            ) : selectedEmail ? (
              <EmailDetail 
                 email={selectedEmail} 
-                onBack={() => setSelectedEmail(null)} 
+                onBack={handleBackToInbox} 
                 onToggleStar={handleToggleStar} 
                 isLoading={isEmailLoading}
              />
