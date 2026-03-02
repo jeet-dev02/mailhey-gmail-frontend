@@ -23,7 +23,8 @@ export default function Home() {
 
   let initialUser = "";
   if (slug[0]) {
-      const rawSlug = decodeURIComponent(slug[0]);
+      // FIX: Force URL parameter to lowercase
+      const rawSlug = decodeURIComponent(slug[0]).toLowerCase();
       initialUser = rawSlug.includes("@") ? rawSlug : `${rawSlug}@mailhey.com`;
   }
   
@@ -92,10 +93,11 @@ export default function Home() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (tempInput.trim()) {
-      const input = tempInput.trim();
+      // FIX: Force input to lowercase
+      const input = tempInput.trim().toLowerCase();
       const fullEmail = input.includes("@") ? input : `${input}@mailhey.com`;
       setCurrentUser(fullEmail);
-      setCurrentView("inbox"); // FIX: Force view to inbox on login
+      setCurrentView("inbox"); 
       window.history.pushState(null, '', `/${fullEmail}/inbox`); 
     }
   };
@@ -126,8 +128,8 @@ export default function Home() {
       setCurrentUser("");
       setTempInput("");
       setCurrentView("inbox"); 
-      setSelectedEmail(null); 
-      setSelectedIds([]);   
+      setSelectedEmail(null); // FIX: Closes any open email
+      setSelectedIds([]);     // FIX: Clears any checked boxes
       window.history.pushState(null, '', `/`);
   };
 
@@ -135,7 +137,6 @@ export default function Home() {
   const [tempInput, setTempInput] = useState("");
 
   const handleToggleStar = (id: string) => {
-    // FIX: Find the email FIRST so we know exactly what state to save
     const targetEmail = emails.find(e => e.id === id);
     if (!targetEmail) return;
     
