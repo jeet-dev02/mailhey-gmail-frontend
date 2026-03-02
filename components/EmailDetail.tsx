@@ -2,6 +2,9 @@
 
 import { ArrowLeft, Trash2, Star } from "lucide-react";
 import { Email } from "@/lib/types";
+// NEW: Imported sanitizeEmailBody
+import { analyzeEmailSecurity, sanitizeEmailBody } from "@/lib/security";
+import { SecurityBanner } from "./SecurityBanner";
 
 interface EmailDetailProps {
     email: Email;
@@ -46,8 +49,11 @@ export function EmailDetail({ email, onBack, onToggleStar, isLoading }: EmailDet
         );
     }
 
+    const securityAssessment = analyzeEmailSecurity(email);
+
     return (
         <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors">
+            {/* Action Bar */}
             <div className="flex items-center gap-4 px-4 py-2 border-b border-gray-100 dark:border-gray-700 transition-colors">
                 <button onClick={onBack} className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-700 rounded-full transition-colors" title="Back to Inbox">
                     <ArrowLeft size={20} className="text-[#444746] dark:text-gray-300" />
@@ -60,23 +66,32 @@ export function EmailDetail({ email, onBack, onToggleStar, isLoading }: EmailDet
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 lg:px-10 lg:py-8">
-                <h2 className="text-2xl font-normal text-[#1F1F1F] dark:text-gray-100 mb-8 transition-colors">{email.subject}</h2>
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto">
                 
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold text-lg uppercase transition-colors">
-                        {email.sender.charAt(0)}
-                    </div>
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-[#1F1F1F] dark:text-gray-200 text-sm transition-colors">{email.sender}</span>
-                        </div>
-                        <span className="text-xs text-[#444746] dark:text-gray-400 transition-colors">to me</span>
-                    </div>
-                </div>
+                <SecurityBanner assessment={securityAssessment} />
 
-                <div className="text-[#1F1F1F] dark:text-gray-300 whitespace-pre-wrap text-sm leading-relaxed transition-colors">
-                    {email.body}
+                {/* Main Email Content */}
+                <div className="p-6 lg:px-10 lg:py-8">
+                    <h2 className="text-2xl font-normal text-[#1F1F1F] dark:text-gray-100 mb-8 transition-colors">{email.subject}</h2>
+                    
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold text-lg uppercase transition-colors">
+                            {email.sender.charAt(0)}
+                        </div>
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-[#1F1F1F] dark:text-gray-200 text-sm transition-colors">{email.sender}</span>
+                            </div>
+                            <span className="text-xs text-[#444746] dark:text-gray-400 transition-colors">to me</span>
+                        </div>
+                    </div>
+
+                    {/* NEW: Secure HTML Rendering Sandbox */}
+                    <div 
+                        className="text-[#1F1F1F] dark:text-gray-300 whitespace-pre-wrap text-sm leading-relaxed transition-colors prose dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: sanitizeEmailBody(email.body) }}
+                    />
                 </div>
             </div>
         </div>
