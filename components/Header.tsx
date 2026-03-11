@@ -23,7 +23,8 @@ export function Header({ currentUser, isDarkMode, toggleDarkMode, searchQuery, s
                         type="text"
                         placeholder={`Search in ${fullEmail}`}
                         value={searchQuery} // Binds the input to our state
-                        onChange={(e) => setSearchQuery(e.target.value)} // Updates state as you type
+                        onChange={(e) => setSearchQuery(e.target.value)} 
+                        maxLength={50}
                         className="flex-1 bg-transparent border-none outline-none text-[#1F1F1F] dark:text-white placeholder-[#444746] dark:placeholder-gray-400 text-[16px]"
                     />
                     {/* Shows an 'X' button only when there is text to clear */}

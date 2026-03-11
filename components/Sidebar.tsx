@@ -1,6 +1,7 @@
 "use client";
 
 import { Inbox, Star, Trash2, Menu } from "lucide-react";
+import { useState } from "react";
 
 interface SidebarProps {
     isOpen: boolean;
@@ -11,6 +12,24 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, toggleSidebar, currentView, setCurrentView, onLogoClick }: SidebarProps) {
+    const [switchInput, setSwitchInput] = useState("");
+
+    const handleSwitchAccount = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!switchInput) return;
+        
+        let cleanUsername = switchInput.split('@')[0];
+        cleanUsername = cleanUsername.replace(/\.[a-z]{2,4}$/i, "");
+        
+        // 1. Allow both letters and numbers
+        cleanUsername = cleanUsername.replace(/[^a-z0-9]/g, "");
+        // 2. Final safety net: ensure it does not start with a number
+        cleanUsername = cleanUsername.replace(/^[0-9]+/, "");
+
+        if (cleanUsername) {
+            window.location.replace(`/${cleanUsername}@mailhey.com/inbox`);
+        }
+    };
     
     const getNavClass = (viewName: string) => {
         const isActive = currentView === viewName;
@@ -38,6 +57,39 @@ export default function Sidebar({ isOpen, toggleSidebar, currentView, setCurrent
                     </div>
                 )}
             </div>
+
+            {/* SIDEBAR INBOX SWITCHER */}
+            {isOpen && (
+                <div className="px-4 mb-4 mt-2">
+                    <form onSubmit={handleSwitchAccount} className="relative">
+                        <input 
+                            type="text" 
+                            placeholder="switch inbox"
+                            maxLength={50}
+                            value={switchInput}
+                            onChange={(e) => {
+                                const sanitizedValue = e.target.value
+                                    .toLowerCase()
+                                    .replace(/\s+/g, '')
+                                    // 1. Allow letters, numbers, @, and .
+                                    .replace(/[^a-z0-9@.]/g, '')
+                                    // 2. Strip numbers if they are at the very beginning
+                                    .replace(/^[0-9]+/, '');
+                                
+                                setSwitchInput(sanitizedValue);
+                            }}
+                            className="w-full px-3 py-2.5 pr-10 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-[#1F1F1F] dark:text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm"
+                        />
+                        <button 
+                            type="submit"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 px-2 py-1 transition-colors"
+                            title="Go to inbox"
+                        >
+                            GO
+                        </button>
+                    </form>
+                </div>
+            )}
 
             <nav className="flex flex-col gap-0.5 mt-2">
                 <div className={getNavClass('inbox')} onClick={() => setCurrentView('inbox')}>

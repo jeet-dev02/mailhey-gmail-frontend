@@ -2,8 +2,10 @@ export interface Email {
     id: string;
     subject: string;
     sender: string;
+    to?: string;           
     body: string;
-    created_at: string;
+    createdAt: string;     
+    created_at?: string;   
     tags?: string[]; 
     isRead?: boolean;
     starred?: boolean;
@@ -11,5 +13,5 @@ export interface Email {
 
 export interface FetchEmailsResponse {
     emails: Email[];
-    // Add other pagination fields if the backend returns them (e.g. total, page, etc)
+    
 }
