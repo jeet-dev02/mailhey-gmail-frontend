@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { fetchEmails } from "@/lib/api";
 import { Email } from "@/lib/types";
 import Sidebar from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { EmailList } from "@/components/EmailList";
 import { EmailDetail } from "@/components/EmailDetail";
+import { AdminDashboard } from "@/components/AdminDashboard";
+import { Shield } from "lucide-react";
 
 const getStarOverrides = () => {
   if (typeof window !== "undefined") {
@@ -18,24 +20,29 @@ const getStarOverrides = () => {
 
 export default function Home() {
   const params = useParams();
+  const router = useRouter();
 
   const slug = (params?.slug as string[]) || [];
 
   // --- SAFE URL PARSER ---
   let initialUser = "";
+  let initialAdminState = false; // <-- NEW: Tracks if URL is /admin
+
   if (slug[0]) {
       const rawSlug = decodeURIComponent(slug[0]).toLowerCase();
       
+      // RULE 0: If the URL is exactly /admin, trigger the God Mode state!
+      if (rawSlug === 'admin') {
+          initialAdminState = true;
+      } 
       // RULE 1: If they typed an '@', the domain MUST be exactly mailhey.com
-      if (rawSlug.includes('@')) {
+      else if (rawSlug.includes('@')) {
           if (rawSlug.endsWith('@mailhey.com')) {
-              initialUser = rawSlug; // Valid! Let them in.
-          } else {
-              // Invalid domain (like @random.com). Reject and kick to login!
-              initialUser = ""; 
+              initialUser = rawSlug;
           }
-      } else {
-          // RULE 2: If there is no '@', assume it's a username. Clean it and append domain.
+      } 
+      // RULE 2: If there is no '@', assume it's a username. Clean it and append domain.
+      else {
           let cleanUsername = rawSlug.replace(/\.[a-z]{2,4}$/i, "");
           cleanUsername = cleanUsername.replace(/[^a-z0-9]/g, "");
           
@@ -66,6 +73,9 @@ export default function Home() {
   const [pendingDeepLink, setPendingDeepLink] = useState<string | null>(
     initialEmailId,
   );
+  
+  // Initialize with the parsed URL state
+  const [showAdminPanel, setShowAdminPanel] = useState(initialAdminState); 
 
   useEffect(() => {
     if (isDarkMode) {
@@ -80,7 +90,6 @@ export default function Home() {
     setError(null);
     try {
       const data = await fetchEmails(currentUser, 1);
-
       const overrides = getStarOverrides();
 
       const mergedData = data.map((email: Email) => {
@@ -110,31 +119,31 @@ export default function Home() {
     fetchInbox();
   }, [currentUser]);
 
+  // Handle Browser Back/Forward Buttons
   useEffect(() => {
     const handlePopState = () => {
-      // If they are inside an inbox (logged in) and hit the back button
+      const path = window.location.pathname;
+      
       if (currentUser) {
-          // Aggressively wipe the state to log them out
           setCurrentUser("");
           setCurrentView("inbox");
           setSelectedEmail(null);
           setTempInput(""); 
-          
-          // Force the URL to stay at the root '/'
-          window.history.replaceState(null, '', '/');
+          setShowAdminPanel(path === '/admin');
+      } else {
+          // If logged out, sync the UI with the URL (/ or /admin)
+          setShowAdminPanel(path === '/admin');
       }
-      // If they are NOT logged in (already on the login screen), do nothing!
-      // This allows the browser to naturally leave the website without crashing.
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [currentUser]); 
 
+  // Force URL synchronization
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (currentUser) {
-        // If logged in, ensure the URL matches the current view perfectly
         const cleanPath = selectedEmail 
             ? `/${currentUser}/${currentView}/${selectedEmail.id}`
             : `/${currentUser}/${currentView}`;
@@ -142,24 +151,27 @@ export default function Home() {
         if (decodeURIComponent(window.location.pathname) !== cleanPath) {
             window.history.replaceState(null, '', cleanPath);
         }
+      } else if (showAdminPanel) {
+        // --- NEW: Keep URL locked to /admin when panel is open ---
+        if (window.location.pathname !== '/admin') {
+            window.history.replaceState(null, '', '/admin');
+        }
       } else if (window.location.pathname !== '/') {
-        // NEW: If they are rejected to the login screen, forcefully clear the URL to root
         window.history.replaceState(null, '', '/');
       }
     }
-  }, [currentUser, currentView, selectedEmail]);
-  // --- SAFE ROUTING HANDLERS ---
+  }, [currentUser, currentView, selectedEmail, showAdminPanel]);
+
+  // --- ACTION HANDLERS ---
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (tempInput.trim()) {
       const input = tempInput.trim().toLowerCase();
 
-      // Apply the same 3-step sanitization
       let cleanUsername = input.split("@")[0];
       cleanUsername = cleanUsername.replace(/\.[a-z]{2,4}$/i, "");
       cleanUsername = cleanUsername.replace(/[^a-z0-9]/g, "");
 
-      // If they only typed special characters, stop the login and clear input
       if (!cleanUsername) {
         setTempInput("");
         return;
@@ -182,11 +194,7 @@ export default function Home() {
   const handleEmailClick = (email: Email) => {
     setIsEmailLoading(true);
     setSelectedEmail(email);
-    window.history.replaceState(
-      null,
-      "",
-      `/${currentUser}/${currentView}/${email.id}`,
-    );
+    window.history.replaceState(null, "", `/${currentUser}/${currentView}/${email.id}`);
 
     setTimeout(() => {
       setIsEmailLoading(false);
@@ -204,28 +212,24 @@ export default function Home() {
     setCurrentView("inbox");
     setSelectedEmail(null);
     setSelectedIds([]);
+    setShowAdminPanel(false);
     window.history.replaceState(null, '', `/`);
   };
 
-  // --- ACTION HANDLERS ---
   const handleToggleStar = (id: string) => {
     const targetEmail = emails.find((e) => e.id === id);
     if (!targetEmail) return;
 
     const newStarredState = !targetEmail.starred;
 
-    // 1. Update React State safely
     setEmails((prev) =>
       prev.map((e) => (e.id === id ? { ...e, starred: newStarredState } : e)),
     );
 
     if (selectedEmail?.id === id) {
-      setSelectedEmail((prev) =>
-        prev ? { ...prev, starred: newStarredState } : null,
-      );
+      setSelectedEmail((prev) => prev ? { ...prev, starred: newStarredState } : null);
     }
 
-    // 2. Save to local storage perfectly
     if (typeof window !== "undefined") {
       const overrides = getStarOverrides();
       overrides[id] = newStarredState;
@@ -234,16 +238,11 @@ export default function Home() {
   };
 
   const handleToggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-    );
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
   };
 
   const handleSelectAll = () => {
-    if (
-      selectedIds.length === displayedEmails.length &&
-      displayedEmails.length > 0
-    ) {
+    if (selectedIds.length === displayedEmails.length && displayedEmails.length > 0) {
       setSelectedIds([]);
     } else {
       setSelectedIds(displayedEmails.map((email) => email.id));
@@ -256,9 +255,7 @@ export default function Home() {
 
     if (searchQuery.trim() !== "") {
       const query = searchQuery.trim().toLowerCase();
-      const matchesSubject = (email.subject || "")
-        .toLowerCase()
-        .includes(query);
+      const matchesSubject = (email.subject || "").toLowerCase().includes(query);
       const matchesSender = (email.sender || "").toLowerCase().includes(query);
       const matchesBody = (email.body || "").toLowerCase().includes(query);
 
@@ -272,20 +269,55 @@ export default function Home() {
   const remainingChars = maxChars - tempInput.length;
 
   if (!currentUser) {
+    if (showAdminPanel) {
+      return (
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 lg:p-8 flex flex-col transition-colors">
+          <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col gap-4">
+            <button 
+              onClick={() => {
+                  // --- NEW: Push the URL back to root ---
+                  setShowAdminPanel(false);
+                  window.history.pushState(null, "", "/");
+              }}
+              className="self-start text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
+            >
+              ← Back to Sign In
+            </button>
+            <AdminDashboard 
+              onSelectUser={(username) => {
+                setShowAdminPanel(false);
+                setCurrentUser(username);
+                setCurrentView("inbox");
+                router.push(`/${username}/inbox`);
+              }} 
+            />
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
+      <div className="relative min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
+        <button
+            onClick={() => {
+                // --- NEW: Push the URL to /admin ---
+                setShowAdminPanel(true);
+                window.history.pushState(null, "", "/admin");
+            }}
+            className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-colors shadow-sm border border-gray-200 dark:border-gray-700 text-sm font-medium z-50"
+        >
+            <Shield size={16} className="text-orange-500" />
+            Admin
+        </button>
+
         <div className="bg-white dark:bg-gray-800 p-10 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 w-full max-w-md">
           <div className="flex justify-center mb-6">
             <div className="text-[33px] font-bold tracking-tight text-indigo-600">
               mail<span className="text-gray-900 dark:text-white">hey</span>
             </div>
           </div>
-          <h1 className="text-xl text-center font-medium text-gray-900 dark:text-white mb-2">
-            Sign in
-          </h1>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 text-sm">
-            to continue
-          </p>
+          <h1 className="text-xl text-center font-medium text-gray-900 dark:text-white mb-2">Sign in</h1>
+          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 text-sm">to continue</p>
 
           <form onSubmit={handleLogin} className="space-y-1">
             <div className="relative">
@@ -296,11 +328,7 @@ export default function Home() {
                 value={tempInput}
                 maxLength={maxChars}
                 onChange={(e) => {
-                    const sanitizedValue = e.target.value
-                        .toLowerCase()
-                        .replace(/\s+/g, '')         
-                        .replace(/[^a-z0-9@.]/g, '') 
-                        .replace(/^[0-9]+/, '');     
+                    const sanitizedValue = e.target.value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9@.]/g, '').replace(/^[0-9]+/, '');     
                     setTempInput(sanitizedValue);
                 }}
                 autoFocus
@@ -308,17 +336,10 @@ export default function Home() {
             </div>
             <div className="flex justify-between items-start mt-1">
               <span></span>
-              <span className="text-xs text-gray-400">
-                {remainingChars} characters remaining
-              </span>
+              <span className="text-xs text-gray-400">{remainingChars} characters remaining</span>
             </div>
             <div className="flex justify-end items-center mt-6 pt-4">
-              <button
-                type="submit"
-                className="bg-indigo-600 text-white px-6 py-2 rounded font-medium hover:bg-indigo-700 transition"
-              >
-                Next
-              </button>
+              <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded font-medium hover:bg-indigo-700 transition">Next</button>
             </div>
           </form>
         </div>
@@ -352,13 +373,16 @@ export default function Home() {
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <p className="mb-4 text-red-500">{error}</p>
-              <button
-                onClick={fetchInbox}
-                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-              >
-                Retry
-              </button>
+              <button onClick={fetchInbox} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Retry</button>
             </div>
+          ) : currentView === 'admin' ? (
+            <AdminDashboard 
+              onSelectUser={(username) => {
+                setCurrentUser(username);
+                setCurrentView("inbox");
+                router.push(`/${username}/inbox`);
+              }} 
+            />
           ) : selectedEmail ? (
             <EmailDetail
               email={selectedEmail}
