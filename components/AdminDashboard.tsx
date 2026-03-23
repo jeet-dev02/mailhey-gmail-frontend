@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Users, Mail, Loader2, ChevronRight, ShieldAlert } from "lucide-react";
+import { fetchAllSystemEmails } from "@/lib/api"; 
 
 interface AggregatedUser {
     username: string;
@@ -18,16 +19,12 @@ export function AdminDashboard({ onSelectUser }: AdminDashboardProps) {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        const fetchSystemEmails = async () => {
+        const loadSystemEmails = async () => {
             try {
-                // Pointing directly to your simulation backend on port 4000
-                const res = await fetch('http://localhost:4000/api/getallemails');
-                
-                if (!res.ok) throw new Error("Backend connection failed.");
-                
-                const json = await res.json();
+               
+                const json = await fetchAllSystemEmails();
 
-                if (json.status === "success") {
+                if (json && json.status === "success") {
                     const sortedData = json.data.sort((a: AggregatedUser, b: AggregatedUser) => b.emailCount - a.emailCount);
                     setUsers(sortedData);
                 } else {
@@ -35,13 +32,13 @@ export function AdminDashboard({ onSelectUser }: AdminDashboardProps) {
                 }
             } catch (err) {
                 console.error(err);
-                setError("Network error: Could not connect to the simulation backend on port 4000.");
+                setError("Network error: Could not connect to the simulation backend.");
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchSystemEmails();
+        loadSystemEmails();
     }, []);
 
     if (isLoading) {
@@ -59,7 +56,7 @@ export function AdminDashboard({ onSelectUser }: AdminDashboardProps) {
                 <ShieldAlert size={48} className="text-red-500 mb-4 opacity-50" />
                 <p className="text-[#1F1F1F] dark:text-gray-200 font-medium mb-2">{error}</p>
                 <p className="text-sm text-[#444746] dark:text-gray-400 text-center max-w-md">
-                    Please ensure your simulation backend is running via <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">npm run dev</code> on port 4000 and CORS is enabled.
+                    Please ensure your simulation backend is running and reachable.
                 </p>
             </div>
         );
@@ -67,7 +64,7 @@ export function AdminDashboard({ onSelectUser }: AdminDashboardProps) {
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors shadow-sm border border-gray-100 dark:border-gray-700">
-            {/* Header matches EmailDetail style */}
+            {/* Header */}
             <div className="px-6 pt-6 lg:px-10 lg:pt-8 shrink-0 border-b border-gray-100 dark:border-gray-700 pb-6">
                 <h2 className="text-2xl font-normal text-[#1F1F1F] dark:text-gray-100 mb-2 transition-colors flex items-center gap-3">
                     <Users className="text-indigo-600 dark:text-indigo-400" size={28} />

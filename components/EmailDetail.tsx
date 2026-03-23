@@ -8,7 +8,7 @@ import { SecurityBanner } from "./SecurityBanner";
 
 interface EmailDetailProps {
     email: Email;
-    currentUser: string; // <-- ADDED: Fixes the TypeScript error
+    currentUser: string; 
     onBack: () => void;
     onToggleStar: (id: string) => void;
     isLoading?: boolean; 
@@ -22,7 +22,7 @@ export function EmailDetail({ email, currentUser, onBack, onToggleStar, isLoadin
     
     const rawDate = email.createdAt || email.created_at; 
     
-    // UPDATED: Dynamically uses currentUser instead of hardcoded 'jeet'
+    // UPDATED: Dynamically uses currentUser instead of hardcoded username
     const displayTo = email.to 
         ? (email.to.includes('@') ? email.to : `${email.to}@mailhey.com`) 
         : (currentUser.includes('@') ? currentUser : `${currentUser}@mailhey.com`);

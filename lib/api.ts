@@ -36,3 +36,21 @@ export async function fetchEmails(recipient: string = "user2@mailhey.com", page:
         return [];
     }
 }
+
+export async function fetchAllSystemEmails() {
+    try {
+        
+        const response = await fetch(`${API_BASE}/getallemails`, {
+             cache: "no-store" 
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch system emails");
+
+        const data = await response.json();
+        return data;
+
+    } catch (error) {
+        console.error(error);
+        throw error; 
+    }
+}
