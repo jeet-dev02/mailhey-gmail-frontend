@@ -24,24 +24,24 @@ export default function Home() {
 
   const slug = (params?.slug as string[]) || [];
 
-  // --- SAFE URL PARSER ---
+  
   let initialUser = "";
-  let initialAdminState = false; // <-- NEW: Tracks if URL is /admin
+  let initialAdminState = false; 
 
   if (slug[0]) {
       const rawSlug = decodeURIComponent(slug[0]).toLowerCase();
       
-      // RULE 0: If the URL is exactly /admin, trigger the God Mode state!
+      
       if (rawSlug === 'admin') {
           initialAdminState = true;
       } 
-      // RULE 1: If they typed an '@', the domain MUST be exactly mailhey.com
+      
       else if (rawSlug.includes('@')) {
           if (rawSlug.endsWith('@mailhey.com')) {
               initialUser = rawSlug;
           }
       } 
-      // RULE 2: If there is no '@', assume it's a username. Clean it and append domain.
+     
       else {
           let cleanUsername = rawSlug.replace(/\.[a-z]{2,4}$/i, "");
           cleanUsername = cleanUsername.replace(/[^a-z0-9]/g, "");
@@ -74,7 +74,7 @@ export default function Home() {
     initialEmailId,
   );
   
-  // Initialize with the parsed URL state
+  
   const [showAdminPanel, setShowAdminPanel] = useState(initialAdminState); 
 
   useEffect(() => {
@@ -101,6 +101,7 @@ export default function Home() {
 
       setEmails(mergedData);
 
+      
       if (pendingDeepLink) {
         const found = mergedData.find((e: Email) => e.id === pendingDeepLink);
         if (found) setSelectedEmail(found);
@@ -119,7 +120,7 @@ export default function Home() {
     fetchInbox();
   }, [currentUser]);
 
-  // Handle Browser Back/Forward Buttons
+  
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
@@ -131,7 +132,7 @@ export default function Home() {
           setTempInput(""); 
           setShowAdminPanel(path === '/admin');
       } else {
-          // If logged out, sync the UI with the URL (/ or /admin)
+          
           setShowAdminPanel(path === '/admin');
       }
     };
@@ -140,7 +141,7 @@ export default function Home() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [currentUser]); 
 
-  // Force URL synchronization
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (currentUser) {
@@ -152,7 +153,6 @@ export default function Home() {
             window.history.replaceState(null, '', cleanPath);
         }
       } else if (showAdminPanel) {
-        // --- NEW: Keep URL locked to /admin when panel is open ---
         if (window.location.pathname !== '/admin') {
             window.history.replaceState(null, '', '/admin');
         }
@@ -162,7 +162,7 @@ export default function Home() {
     }
   }, [currentUser, currentView, selectedEmail, showAdminPanel]);
 
-  // --- ACTION HANDLERS ---
+  
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (tempInput.trim()) {
@@ -275,7 +275,6 @@ export default function Home() {
           <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col gap-4">
             <button 
               onClick={() => {
-                  // --- NEW: Push the URL back to root ---
                   setShowAdminPanel(false);
                   window.history.pushState(null, "", "/");
               }}
@@ -284,11 +283,13 @@ export default function Home() {
               ← Back to Sign In
             </button>
             <AdminDashboard 
-              onSelectUser={(username) => {
+             
+              onSelectEmail={(username, emailId) => {
                 setShowAdminPanel(false);
                 setCurrentUser(username);
                 setCurrentView("inbox");
-                router.push(`/${username}/inbox`);
+                setPendingDeepLink(emailId); 
+                router.push(`/${username}/inbox/${emailId}`);
               }} 
             />
           </div>
@@ -300,7 +301,6 @@ export default function Home() {
       <div className="relative min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
         <button
             onClick={() => {
-                // --- NEW: Push the URL to /admin ---
                 setShowAdminPanel(true);
                 window.history.pushState(null, "", "/admin");
             }}
@@ -377,10 +377,12 @@ export default function Home() {
             </div>
           ) : currentView === 'admin' ? (
             <AdminDashboard 
-              onSelectUser={(username) => {
+              
+              onSelectEmail={(username, emailId) => {
                 setCurrentUser(username);
                 setCurrentView("inbox");
-                router.push(`/${username}/inbox`);
+                setPendingDeepLink(emailId); 
+                router.push(`/${username}/inbox/${emailId}`);
               }} 
             />
           ) : selectedEmail ? (

@@ -13,7 +13,6 @@ export async function fetchEmails(recipient: string = "user2@mailhey.com", page:
 
         const data = await response.json();
         
-        // DEBUG: This will print the exact data from Vercel in your VS Code terminal!
         console.log("RAW BACKEND DATA:", JSON.stringify(data, null, 2));
 
         const rawEmails = Array.isArray(data) ? data : (data.emails || []);
@@ -22,10 +21,7 @@ export async function fetchEmails(recipient: string = "user2@mailhey.com", page:
             id: e.id || Math.random().toString(),
             sender: e.from || e.sender || "Unknown",
             subject: e.subject || "(No Subject)",
-            
-            // THE ULTIMATE FIX: Check every possible name for the body text
             body: e.body || e.text || e.content || e.snippet || "", 
-            
             date: e.createdAt || e.date_received || new Date().toISOString(),
             read: true,
             starred: false
@@ -40,14 +36,29 @@ export async function fetchEmails(recipient: string = "user2@mailhey.com", page:
 export async function fetchAllSystemEmails() {
     try {
         
-        const response = await fetch(`${API_BASE}/getallemails`, {
+        const SIMULATION_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        
+        const response = await fetch(`${SIMULATION_BACKEND_URL}/api/getallemails`, {
              cache: "no-store" 
         });
 
         if (!response.ok) throw new Error("Failed to fetch system emails");
 
-        const data = await response.json();
-        return data;
+        const json = await response.json();
+
+        
+        if (json && json.status === "success" && Array.isArray(json.data)) {
+            json.data = json.data.map((e: any) => ({
+                id: e.id || Math.random().toString(),
+                sender: e.from || e.sender || "System",
+                subject: e.subject || "(No Subject)",
+                body: e.body || e.text || e.content || e.snippet || "",
+                createdAt: e.createdAt || e.date_received || e.date || new Date().toISOString(),
+                username: e.username || "unknown"
+            }));
+        }
+
+        return json;
 
     } catch (error) {
         console.error(error);

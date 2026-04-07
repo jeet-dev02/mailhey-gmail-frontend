@@ -1,32 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Mail, Loader2, ChevronRight, ShieldAlert } from "lucide-react";
-import { fetchAllSystemEmails } from "@/lib/api"; 
+import { ShieldAlert, Loader2, Shield, User } from "lucide-react";
+import { fetchAllSystemEmails } from "@/lib/api";
+import { Email } from "@/lib/types";
 
-interface AggregatedUser {
+
+interface SystemEmail extends Email {
     username: string;
-    emailCount: number;
 }
 
 interface AdminDashboardProps {
-    onSelectUser: (username: string) => void;
+    onSelectEmail: (username: string, emailId: string) => void;
 }
 
-export function AdminDashboard({ onSelectUser }: AdminDashboardProps) {
-    const [users, setUsers] = useState<AggregatedUser[]>([]);
+export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
+    const [emails, setEmails] = useState<SystemEmail[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
 
     useEffect(() => {
         const loadSystemEmails = async () => {
             try {
-               
                 const json = await fetchAllSystemEmails();
-
                 if (json && json.status === "success") {
-                    const sortedData = json.data.sort((a: AggregatedUser, b: AggregatedUser) => b.emailCount - a.emailCount);
-                    setUsers(sortedData);
+                    setEmails(json.data);
                 } else {
                     setError("Failed to load system data.");
                 }
@@ -37,15 +35,21 @@ export function AdminDashboard({ onSelectUser }: AdminDashboardProps) {
                 setIsLoading(false);
             }
         };
-
         loadSystemEmails();
     }, []);
+
+    const formatShortDate = (dateString?: string) => {
+        if (!dateString) return "";
+        try {
+            return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch { return ""; }
+    };
 
     if (isLoading) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors items-center justify-center text-[#444746] dark:text-gray-400 shadow-sm border border-gray-100 dark:border-gray-700">
                 <Loader2 size={32} className="animate-spin mb-4 text-indigo-600 dark:text-indigo-400" />
-                <p className="text-sm font-medium">Aggregating system emails...</p>
+                <p className="text-sm font-medium">Loading global email stream...</p>
             </div>
         );
     }
@@ -55,9 +59,6 @@ export function AdminDashboard({ onSelectUser }: AdminDashboardProps) {
             <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors items-center justify-center p-8 shadow-sm border border-gray-100 dark:border-gray-700">
                 <ShieldAlert size={48} className="text-red-500 mb-4 opacity-50" />
                 <p className="text-[#1F1F1F] dark:text-gray-200 font-medium mb-2">{error}</p>
-                <p className="text-sm text-[#444746] dark:text-gray-400 text-center max-w-md">
-                    Please ensure your simulation backend is running and reachable.
-                </p>
             </div>
         );
     }
@@ -67,41 +68,50 @@ export function AdminDashboard({ onSelectUser }: AdminDashboardProps) {
             {/* Header */}
             <div className="px-6 pt-6 lg:px-10 lg:pt-8 shrink-0 border-b border-gray-100 dark:border-gray-700 pb-6">
                 <h2 className="text-2xl font-normal text-[#1F1F1F] dark:text-gray-100 mb-2 transition-colors flex items-center gap-3">
-                    <Users className="text-indigo-600 dark:text-indigo-400" size={28} />
-                    System Admin Dashboard
+                    <Shield className="text-indigo-600 dark:text-indigo-400" size={28} />
+                    Global Email Stream
                 </h2>
-                <p className="text-sm text-[#444746] dark:text-gray-400">Global overview of all active simulation inboxes.</p>
+                <p className="text-sm text-[#444746] dark:text-gray-400">Viewing all active emails across the system.</p>
             </div>
 
-            {/* List Area */}
-            <div className="flex-1 overflow-y-auto p-6 lg:px-10 bg-gray-50/50 dark:bg-gray-800/50">
-                <div className="grid gap-3">
-                    {users.map((user) => (
+            {/* Flat Email List */}
+            <div className="flex-1 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50">
+                <div className="flex flex-col">
+                    {emails.map((email) => (
                         <div 
-                            key={user.username}
-                            onClick={() => onSelectUser(user.username)}
-                            className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-[#1E1E1E] hover:bg-indigo-50 dark:hover:bg-gray-700/80 cursor-pointer transition-colors group"
+                            key={email.id}
+                            onClick={() => onSelectEmail(email.username, email.id)}
+                            className="flex items-center gap-4 px-6 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700/80 cursor-pointer transition-colors group"
                         >
-                            <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 mt-1 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold text-lg uppercase transition-colors shrink-0">
-                                    {user.username.charAt(0)}
-                                </div>
-                                <span className="font-bold text-[#1F1F1F] dark:text-gray-200 text-sm transition-colors">
-                                    {user.username}
+                            {/* Sender Info - NOW CLEAN & STRIPPED OF HTML */}
+                            <div className="w-48 font-bold text-[#1F1F1F] dark:text-gray-200 text-sm truncate shrink-0">
+                                {email.sender.replace(/<[^>]+>/g, '').trim().split('@')[0]}
+                            </div>
+
+                            {/* Subject & Body Preview */}
+                            <div className="flex-1 flex items-center min-w-0 text-sm">
+                                <span className="font-semibold text-[#1F1F1F] dark:text-gray-200 truncate mr-2">
+                                    {email.subject}
+                                </span>
+                                <span className="text-[#444746] dark:text-gray-500 truncate">
+                                    - {email.body.replace(/<[^>]*>?/gm, '')}
                                 </span>
                             </div>
-                            
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2 text-xs font-medium text-[#444746] dark:text-gray-400">
-                                    <Mail size={14} />
-                                    {user.emailCount} emails
-                                </div>
-                                <ChevronRight size={18} className="text-gray-300 dark:text-gray-600 group-hover:text-indigo-500 transition-colors" />
+
+                            {/* The specific USERNAME this belongs to */}
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-semibold shrink-0">
+                                <User size={12} />
+                                {email.username}
+                            </div>
+
+                            {/* Date */}
+                            <div className="w-16 text-right text-xs text-[#444746] dark:text-gray-400 font-medium shrink-0">
+                                {formatShortDate(email.createdAt || email.created_at)}
                             </div>
                         </div>
                     ))}
                     
-                    {users.length === 0 && (
+                    {emails.length === 0 && (
                         <div className="text-center py-12 text-[#444746] dark:text-gray-500 text-sm">No emails found in the system.</div>
                     )}
                 </div>
