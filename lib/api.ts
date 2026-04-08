@@ -36,7 +36,7 @@ export async function fetchEmails(recipient: string = "user2@mailhey.com", page:
 export async function fetchAllSystemEmails() {
     try {
         
-        const SIMULATION_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        const SIMULATION_BACKEND_URL = process.env.NEXT_PUBLIC_API_DESTINATION || 'http://localhost:4000';
         
         const response = await fetch(`${SIMULATION_BACKEND_URL}/api/getallemails`, {
              cache: "no-store" 
