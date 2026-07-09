@@ -1,15 +1,24 @@
 // lib/api.ts
 import { Email } from "./types";
 
-const API_BASE = "/api"; 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mailhey-jkcw.onrender.com";
+const API_BASE = `${API_BASE_URL}/api`; 
 
-export async function fetchEmails(recipient: string = "user2@mailhey.com", page: number = 1): Promise<Email[]> {
+//  Interface for pagination response
+export interface FetchEmailsResponse {
+    emails: Email[];
+    currentPage: number;
+    totalPages: number;
+}
+
+//  Returns FetchEmailsResponse instead of just Promise<Email[]>
+export async function fetchEmails(recipient: string = "user2@mailhey.com", page: number = 1): Promise<FetchEmailsResponse> {
     try {
         const response = await fetch(`${API_BASE}/fetch-emails?recipient=${encodeURIComponent(recipient)}&page=${page}`, {
              cache: "no-store" 
         });
 
-        if (!response.ok) throw new Error("Failed");
+        if (!response.ok) throw new Error("Failed to fetch emails from Render");
 
         const data = await response.json();
         
@@ -17,36 +26,63 @@ export async function fetchEmails(recipient: string = "user2@mailhey.com", page:
 
         const rawEmails = Array.isArray(data) ? data : (data.emails || []);
 
-        return rawEmails.map((e: any) => ({
+        const formattedEmails = rawEmails.map((e: any) => ({
             id: e.id || Math.random().toString(),
             sender: e.from || e.sender || "Unknown",
             subject: e.subject || "(No Subject)",
-            body: e.body || e.text || e.content || e.snippet || "", 
-            date: e.createdAt || e.date_received || new Date().toISOString(),
-            read: true,
+            body: e.snippet || e.body || e.text || e.content || "", 
+            date: e.date_received || e.createdAt || new Date().toISOString(),
+            read: e.read === 1 || e.read === true, 
             starred: false
         }));
 
+        //  Return the formatted emails alongside pagination info
+        return {
+            emails: formattedEmails,
+            currentPage: data.currentPage || 1,
+            totalPages: data.totalPages || 1
+        };
+
     } catch (error) {
-        console.error(error);
-        return [];
+        console.error("Error in fetchEmails:", error);
+        // Fallback return matches the new FetchEmailsResponse type
+        return { emails: [], currentPage: 1, totalPages: 1 };
+    }
+}
+
+export async function fetchEmailDetail(emailId: string | number, inboxUsername: string) {
+    try {
+        const response = await fetch(`${API_BASE}/fetch-email-by-id/${emailId}?inbox=${encodeURIComponent(inboxUsername)}`, {
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch email details. Status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error in fetchEmailDetail:", error);
+        return null;
     }
 }
 
 export async function fetchAllSystemEmails() {
     try {
-        
-        const SIMULATION_BACKEND_URL = process.env.NEXT_PUBLIC_API_DESTINATION || 'http://localhost:4000';
-        
-        const response = await fetch(`${SIMULATION_BACKEND_URL}/api/getallemails`, {
+        const response = await fetch(`${API_BASE}/getallemails`, {
              cache: "no-store" 
         });
 
-        if (!response.ok) throw new Error("Failed to fetch system emails");
+     
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Render Backend Error - Status: ${response.status} ${response.statusText}`);
+            console.error(`Render Error Details:`, errorText);
+            throw new Error(`Backend rejected request: ${response.status}`);
+        }
 
         const json = await response.json();
 
-        
         if (json && json.status === "success" && Array.isArray(json.data)) {
             json.data = json.data.map((e: any) => ({
                 id: e.id || Math.random().toString(),
@@ -54,14 +90,28 @@ export async function fetchAllSystemEmails() {
                 subject: e.subject || "(No Subject)",
                 body: e.body || e.text || e.content || e.snippet || "",
                 createdAt: e.createdAt || e.date_received || e.date || new Date().toISOString(),
-                username: e.username || "unknown"
+               username: e.recipient || e.to || e.username || "Unknown User"
             }));
         }
 
         return json;
 
     } catch (error) {
-        console.error(error);
+        console.error("Error in fetchAllSystemEmails:", error);
         throw error; 
+    }
+}
+
+//  Function to hit your mark-read endpoint
+export async function toggleEmailReadStatus(emailId: string | number, currentReadStatus: boolean) {
+    try {
+        await fetch(`${API_BASE}/mark-read`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // We flip the status: if it was read (true), we send false to mark unread
+            body: JSON.stringify({ id: emailId, read: !currentReadStatus })
+        });
+    } catch (error) {
+        console.error("Error updating read status:", error);
     }
 }

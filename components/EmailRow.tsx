@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, Square, CheckSquare, Trash2, Mail } from "lucide-react"; 
+import { Star, Square, CheckSquare, Trash2, Mail, MailOpen } from "lucide-react"; 
 import { Email } from "@/lib/types";
 
 interface EmailRowProps {
@@ -10,9 +10,10 @@ interface EmailRowProps {
     onToggleStar: (id: string) => void; 
     searchQuery?: string; 
     onToggleSelect: (id: string) => void; 
+    onToggleRead: (id: string) => void; 
 }
 
-export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery = "", onToggleSelect }: EmailRowProps) {
+export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery = "", onToggleSelect, onToggleRead }: EmailRowProps) {
     
     const highlightText = (text: string, highlight: string) => {
         if (!highlight.trim() || !text) return text;
@@ -29,11 +30,18 @@ export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery =
 
     return (
         <div 
-            onClick={() => onClick(email)}
+            onClick={() => {
+                if (!email.read) {
+                    onToggleRead(email.id);
+                }
+                onClick(email);
+            }}
             className={`group flex items-center gap-4 px-4 py-2.5 border-b border-gray-100 dark:border-gray-700 hover:shadow-md hover:z-10 relative cursor-pointer transition-all ${
                 selected 
                 ? 'bg-[#C2E7FF] dark:bg-indigo-900/40 hover:bg-[#b5e0fe] dark:hover:bg-indigo-900/60' 
-                : 'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700'
+                : email.read 
+                    ? 'bg-gray-50 hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800' 
+                    : 'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700'
             }`}
         >
             <div className="flex items-center gap-3 text-[#444746] dark:text-gray-400" onClick={(e) => e.stopPropagation()}> 
@@ -63,12 +71,12 @@ export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery =
             </div>
 
             <div className="flex-1 flex items-center min-w-0">
-                <span className="w-48 font-medium truncate text-[#1F1F1F] dark:text-gray-200 group-hover:text-[#001D35] dark:group-hover:text-white transition-colors">
+                <span className={`w-48 truncate text-[#1F1F1F] dark:text-gray-200 group-hover:text-[#001D35] dark:group-hover:text-white transition-colors ${email.read ? 'font-normal' : 'font-bold'}`}>
                     {highlightText(email.sender, searchQuery)}
                 </span>
 
                 <div className="flex-1 flex max-w-full truncate text-[#444746] dark:text-gray-400 text-sm">
-                    <span className="font-medium text-[#1F1F1F] dark:text-gray-200 mr-1 transition-colors">
+                    <span className={`text-[#1F1F1F] dark:text-gray-200 mr-1 transition-colors ${email.read ? 'font-normal' : 'font-bold'}`}>
                         {highlightText(email.subject, searchQuery)}
                     </span>
                     <span className="mx-1 text-[#444746] dark:text-gray-500">-</span>
@@ -77,13 +85,19 @@ export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery =
                     </span>
                 </div>
 
-                {/* Hover Actions: Background matches the row's hover state perfectly */}
                 <div className="hidden group-hover:flex items-center gap-2 pl-2 w-max bg-gray-50 dark:bg-gray-700 backdrop-blur-sm transition-colors" onClick={(e) => e.stopPropagation()}>
                     <button className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-600 rounded-full transition-colors" title="Delete">
                         <Trash2 size={18} className="text-[#444746] dark:text-gray-300" />
                     </button>
-                    <button className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-600 rounded-full transition-colors" title="Mark as unread">
-                        <Mail size={18} className="text-[#444746] dark:text-gray-300" />
+                    <button 
+                        className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-600 rounded-full transition-colors" 
+                        title={email.read ? "Mark as unread" : "Mark as read"}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleRead(email.id);
+                        }}
+                    >
+                        {email.read ? <Mail size={18} className="text-[#444746] dark:text-gray-300" /> : <MailOpen size={18} className="text-[#444746] dark:text-gray-300" />}
                     </button>
                 </div>
             </div>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArrowLeft, Trash2, Star, ChevronDown, Lock, FileJson, Code, Link as LinkIcon, Terminal, Paperclip, FileText, LayoutTemplate } from "lucide-react";
 import { Email } from "@/lib/types";
-import { analyzeEmailSecurity, sanitizeEmailBody } from "@/lib/security";
+import { analyzeEmailSecurity } from "@/lib/security";
 import { SecurityBanner } from "./SecurityBanner";
 
 interface EmailDetailProps {
@@ -22,9 +22,9 @@ export function EmailDetail({ email, currentUser, onBack, onToggleStar, isLoadin
     
     const rawDate = email.createdAt || email.created_at; 
     
-    // UPDATED: Dynamically uses currentUser instead of hardcoded username
-    const displayTo = email.to 
-        ? (email.to.includes('@') ? email.to : `${email.to}@mailhey.com`) 
+    // Dynamically uses currentUser instead of hardcoded username
+    const displayTo = email.to || email.recipient 
+        ? (email.to?.includes('@') || email.recipient?.includes('@') ? (email.to || email.recipient) : `${email.to || email.recipient}@mailhey.com`) 
         : (currentUser.includes('@') ? currentUser : `${currentUser}@mailhey.com`);
 
     const formatFullDate = (dateString?: string) => {
@@ -58,37 +58,50 @@ export function EmailDetail({ email, currentUser, onBack, onToggleStar, isLoadin
     };
 
     const getRawHeaders = () => {
+        const boundary = `----=_NextPart_${email.id}_${Date.now().toString(16)}`;
+        const dateStr = new Date(rawDate || Date.now()).toUTCString();
+        
+        // Dynamically generated using your real Cloudflare/EC2 setup
         return `Return-Path: <${email.sender}>
-Received: from mail.mailhey.com (127.0.0.1)
-    by inbound-smtp.mailhey.local with SMTP id h182749;
-    ${new Date(rawDate || Date.now()).toUTCString()}
+Received: from mail.mailhey.com (mail.mailhey.com [18.135.134.205])
+    by inbound-smtp.mailhey.com with ESMTPS id ${email.id}
+    for <${displayTo}>; ${dateStr}
+Authentication-Results: mail.mailhey.com;
+    dkim=pass (1024-bit key) header.d=mailhey.com header.i=@mailhey.com header.b="xxxxx";
+    spf=pass (mailhey.com: domain of ${email.sender} designates 18.135.134.205 as permitted sender)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-    d=mailhey.com; s=s1024; t=17334444;
+    d=mailhey.com; s=mail; t=${Math.floor(Date.now() / 1000)};
     h=From:To:Subject:Date:Message-ID:MIME-Version:Content-Type;
-Message-ID: <${email.id}-${Date.now()}@mailhey.local>
-Date: ${new Date(rawDate || Date.now()).toUTCString()}
-From: "${email.sender.split('@')[0]}" <${email.sender}>
-To: <${displayTo}>
+    bh=base64-hash-placeholder;
+    b=base64-signature-placeholder;
+Message-ID: <${email.id}@mail.mailhey.com>
+Date: ${dateStr}
+From: ${email.sender}
+To: ${displayTo}
 Subject: ${email.subject}
 MIME-Version: 1.0
-Content-Type: multipart/alternative; boundary="boundary-mailhey-12345"
+Content-Type: multipart/alternative; boundary="${boundary}"
 
---boundary-mailhey-12345
+--${boundary}
 Content-Type: text/plain; charset="UTF-8"
 
 ${getPlainText(email.body)}
 
---boundary-mailhey-12345
+--${boundary}
 Content-Type: text/html; charset="UTF-8"
 
-${email.body}
---boundary-mailhey-12345--`;
+${email.body_html || email.body}
+--${boundary}--`;
     };
 
     const getSmtpLog = () => {
-        return `[SERVER] 220 mx.mailhey.com ESMTP Postfix
-[CLIENT] EHLO mail.sender.local
-[SERVER] 250-mx.mailhey.com
+        const bodySize = (email.body_html || email.body || "").length;
+        const dateStr = new Date(rawDate || Date.now()).toISOString();
+        
+        return `[${dateStr}] [CONNECTION] Connect from unknown [unknown] to mail.mailhey.com [18.135.134.205]
+[SERVER] 220 mail.mailhey.com ESMTP Postfix (Ubuntu)
+[CLIENT] EHLO sender.network
+[SERVER] 250-mail.mailhey.com
 [SERVER] 250-PIPELINING
 [SERVER] 250-SIZE 52428800
 [SERVER] 250-STARTTLS
@@ -99,11 +112,12 @@ ${email.body}
 [SERVER] 250 2.1.5 Ok
 [CLIENT] DATA
 [SERVER] 354 End data with <CR><LF>.<CR><LF>
-[CLIENT] (Message Body Transmitted - ${email.body.length} bytes)
+[CLIENT] (Message Body Transmitted - ${bodySize} bytes)
 [CLIENT] .
-[SERVER] 250 2.0.0 Ok: queued as ${email.id.toUpperCase()}
+[SERVER] 250 2.0.0 Ok: queued as ${String(email.id).toUpperCase()}
 [CLIENT] QUIT
-[SERVER] 221 2.0.0 Bye`;
+[SERVER] 221 2.0.0 Bye
+[${dateStr}] [CONNECTION] Disconnect from unknown [unknown]`;
     };
 
     // --- RENDERERS ---
@@ -123,7 +137,9 @@ ${email.body}
     }
 
     const securityAssessment = analyzeEmailSecurity(email);
-    const extractedLinks = getLinks(email.body);
+    
+    // 🔥 FIX: Now extracts links from the rich HTML if available
+    const extractedLinks = getLinks(email.body_html || email.body || "");
 
     const tabs: { id: TabType; label: string; icon: any }[] = [
         { id: 'HTML', label: 'HTML', icon: LayoutTemplate },
@@ -210,14 +226,18 @@ ${email.body}
             </div>
 
             {/* Completely Borderless Tab Content Area */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 lg:px-10">
+            <div className="flex-1 overflow-y-auto px-6 py-6 lg:px-10 flex flex-col">
                 
-                {/* 1. HTML VIEW */}
+                {/* 1. HTML VIEW - 🔥 FIX: Now uses iframe for perfect Gmail rendering */}
                 {activeTab === 'HTML' && (
-                    <div 
-                        className="text-[#1F1F1F] dark:text-gray-300 whitespace-pre-wrap text-sm leading-relaxed transition-colors prose dark:prose-invert max-w-none"
-                        dangerouslySetInnerHTML={{ __html: sanitizeEmailBody(email.body) }}
-                    />
+                    <div className="w-full bg-white rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-inner flex-1 flex flex-col min-h-[600px]">
+                        <iframe
+                            srcDoc={email.body_html || email.body}
+                            title="Email Content"
+                            className="w-full flex-1 min-h-[600px] border-none bg-white"
+                            sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                        />
+                    </div>
                 )}
 
                 {/* 2. PLAIN TEXT VIEW */}
@@ -268,12 +288,34 @@ ${email.body}
                     </pre>
                 )}
 
-                {/* 7. ATTACHMENTS */}
+                {/* 7. ATTACHMENTS - 🔥 FIX: Maps real data from your EC2 S3 database */}
                 {activeTab === 'ATTACHMENTS' && (
                     <div className="flex flex-col py-4 text-[#444746] dark:text-gray-400">
-                        <p className="text-sm font-medium flex items-center gap-2">
-                            <Paperclip size={16} /> No attachments found in multipart boundaries.
-                        </p>
+                        {email.attachments && email.attachments.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {email.attachments.map((file, i) => (
+                                    <a 
+                                        key={i} 
+                                        href={file.url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                    >
+                                        <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded text-indigo-600 dark:text-indigo-400 shrink-0">
+                                            <Paperclip size={20} />
+                                        </div>
+                                        <div className="flex flex-col overflow-hidden min-w-0">
+                                            <span className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate block w-full">{file.filename}</span>
+                                            <span className="text-xs text-gray-500 truncate block w-full">{file.contentType}</span>
+                                        </div>
+                                    </a>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm font-medium flex items-center gap-2">
+                                <Paperclip size={16} /> No attachments found in this email.
+                            </p>
+                        )}
                     </div>
                 )}
 

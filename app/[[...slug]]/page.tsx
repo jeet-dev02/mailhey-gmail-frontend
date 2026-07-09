@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { fetchEmails } from "@/lib/api";
+import { fetchEmails, fetchEmailDetail } from "@/lib/api";
 import { Email } from "@/lib/types";
 import Sidebar from "@/components/Sidebar";
 import { Header } from "@/components/Header";
-import { EmailList } from "@/components/EmailList";
+import {EmailList} from "@/components/EmailList";
 import { EmailDetail } from "@/components/EmailDetail";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { Shield } from "lucide-react";
@@ -23,7 +23,6 @@ export default function Home() {
   const router = useRouter();
 
   const slug = (params?.slug as string[]) || [];
-
   
   let initialUser = "";
   let initialAdminState = false; 
@@ -31,17 +30,14 @@ export default function Home() {
   if (slug[0]) {
       const rawSlug = decodeURIComponent(slug[0]).toLowerCase();
       
-      
       if (rawSlug === 'admin') {
           initialAdminState = true;
       } 
-      
       else if (rawSlug.includes('@')) {
           if (rawSlug.endsWith('@mailhey.com')) {
               initialUser = rawSlug;
           }
       } 
-     
       else {
           let cleanUsername = rawSlug.replace(/\.[a-z]{2,4}$/i, "");
           cleanUsername = cleanUsername.replace(/[^a-z0-9]/g, "");
@@ -73,9 +69,10 @@ export default function Home() {
   const [pendingDeepLink, setPendingDeepLink] = useState<string | null>(
     initialEmailId,
   );
-  
-  
   const [showAdminPanel, setShowAdminPanel] = useState(initialAdminState); 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
 
   useEffect(() => {
     if (isDarkMode) {
@@ -85,14 +82,16 @@ export default function Home() {
     }
   }, [isDarkMode]);
 
-  const fetchInbox = async () => {
+  //  Added (pageToFetch: number = currentPage) to resolve TypeScript error
+  const fetchInbox = async (pageToFetch: number = currentPage) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchEmails(currentUser, 1);
+      //  Passed pageToFetch to the API call
+      const data = await fetchEmails(currentUser, pageToFetch);
       const overrides = getStarOverrides();
 
-      const mergedData = data.map((email: Email) => {
+      const mergedData = data.emails.map((email: Email) => {
         if (overrides[email.id] !== undefined) {
           return { ...email, starred: overrides[email.id] };
         }
@@ -100,11 +99,18 @@ export default function Home() {
       });
 
       setEmails(mergedData);
-
+      setCurrentPage(data.currentPage);
+      setTotalPages(data.totalPages);
       
       if (pendingDeepLink) {
         const found = mergedData.find((e: Email) => e.id === pendingDeepLink);
-        if (found) setSelectedEmail(found);
+        if (found) {
+          setSelectedEmail(found);
+          const username = currentUser.split('@')[0];
+          fetchEmailDetail(found.id, username).then(fullDetails => {
+              if (fullDetails) setSelectedEmail(prev => prev ? { ...prev, ...fullDetails } : null);
+          });
+        }
         setPendingDeepLink(null);
       }
     } catch (err) {
@@ -119,7 +125,6 @@ export default function Home() {
     if (!currentUser) return;
     fetchInbox();
   }, [currentUser]);
-
   
   useEffect(() => {
     const handlePopState = () => {
@@ -132,7 +137,6 @@ export default function Home() {
           setTempInput(""); 
           setShowAdminPanel(path === '/admin');
       } else {
-          
           setShowAdminPanel(path === '/admin');
       }
     };
@@ -140,7 +144,6 @@ export default function Home() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [currentUser]); 
-
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -161,7 +164,6 @@ export default function Home() {
       }
     }
   }, [currentUser, currentView, selectedEmail, showAdminPanel]);
-
   
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,14 +193,18 @@ export default function Home() {
     window.history.replaceState(null, "", `/${currentUser}/${view}`);
   };
 
-  const handleEmailClick = (email: Email) => {
+  const handleEmailClick = async (email: Email) => {
     setIsEmailLoading(true);
     setSelectedEmail(email);
     window.history.replaceState(null, "", `/${currentUser}/${currentView}/${email.id}`);
+    const username = currentUser.split('@')[0];
+    const fullDetails = await fetchEmailDetail(email.id, username);
 
-    setTimeout(() => {
-      setIsEmailLoading(false);
-    }, 500);
+   if (fullDetails) {
+      setSelectedEmail(prev => prev ? { ...prev, ...fullDetails } : null);
+    }
+
+    setIsEmailLoading(false);
   };
 
   const handleBackToInbox = () => {
@@ -234,6 +240,27 @@ export default function Home() {
       const overrides = getStarOverrides();
       overrides[id] = newStarredState;
       localStorage.setItem("mailhey_star_overrides", JSON.stringify(overrides));
+    }
+  };
+
+  const handleToggleRead = async (emailId: string) => {
+    const targetEmail = emails.find((e) => e.id === emailId);
+    if (!targetEmail) return;
+    
+    const newReadState = !targetEmail.read;
+    setEmails((prev) =>
+      prev.map((e) => (e.id === emailId ? { ...e, read: newReadState } : e))
+    );
+    
+    import('@/lib/api').then(({ toggleEmailReadStatus }) => {
+        toggleEmailReadStatus(emailId, targetEmail.read || false);
+    });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      fetchInbox(newPage);
     }
   };
 
@@ -328,7 +355,7 @@ export default function Home() {
                 value={tempInput}
                 maxLength={maxChars}
                 onChange={(e) => {
-                    const sanitizedValue = e.target.value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9@.]/g, '').replace(/^[0-9]+/, '');     
+                    const sanitizedValue = e.target.value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9@.]/g, '').replace(/^[0-9]+/, '');    
                     setTempInput(sanitizedValue);
                 }}
                 autoFocus
@@ -373,7 +400,8 @@ export default function Home() {
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <p className="mb-4 text-red-500">{error}</p>
-              <button onClick={fetchInbox} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Retry</button>
+              {/*  Changed to an arrow function to prevent React event object errors */}
+              <button onClick={() => fetchInbox()} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Retry</button>
             </div>
           ) : currentView === 'admin' ? (
             <AdminDashboard 
@@ -394,15 +422,19 @@ export default function Home() {
               isLoading={isEmailLoading}
             />
           ) : (
-            <EmailList
+           <EmailList
               emails={displayedEmails}
               onEmailClick={handleEmailClick}
               onToggleStar={handleToggleStar}
-              onRefresh={fetchInbox}
+              onRefresh={() => fetchInbox(1)}
               searchQuery={searchQuery}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               onSelectAll={handleSelectAll}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              onToggleRead={handleToggleRead}
             />
           )}
         </main>

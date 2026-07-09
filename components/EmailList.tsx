@@ -12,10 +12,27 @@ interface EmailListProps {
   searchQuery?: string;
   selectedIds: string[];                 
   onToggleSelect: (id: string) => void;  
-  onSelectAll: () => void;               
+  onSelectAll: () => void;
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onToggleRead: (id: string) => void;
 }
 
-export function EmailList({ emails, onEmailClick, onToggleStar, onRefresh, searchQuery = "", selectedIds, onToggleSelect, onSelectAll }: EmailListProps) {
+export function EmailList({ 
+    emails, 
+    onEmailClick, 
+    onToggleStar, 
+    onRefresh, 
+    searchQuery = "", 
+    selectedIds, 
+    onToggleSelect, 
+    onSelectAll,
+    currentPage,
+    totalPages,
+    onPageChange,
+    onToggleRead
+}: EmailListProps) {
     
     const allSelected = emails.length > 0 && selectedIds.length === emails.length;
     const someSelected = selectedIds.length > 0 && selectedIds.length < emails.length;
@@ -39,11 +56,24 @@ export function EmailList({ emails, onEmailClick, onToggleStar, onRefresh, searc
                         <RefreshCw size={18} className="text-[#444746] dark:text-gray-300" />
                     </button>
                 </div>
+                
                 <div className="flex items-center gap-4 text-sm text-[#444746] dark:text-gray-300">
-                    <span>1-{emails.length === 0 ? 0 : emails.length} of {emails.length}</span>
+                    <span>Page {currentPage} of {totalPages}</span>
                     <div className="flex items-center gap-1">
-                        <button className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-700 rounded-full disabled:opacity-50 transition-colors"><ChevronLeft size={20} /></button>
-                        <button className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-700 rounded-full disabled:opacity-50 transition-colors"><ChevronRight size={20} /></button>
+                        <button 
+                            onClick={() => onPageChange(currentPage - 1)}
+                            disabled={currentPage <= 1}
+                            className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-700 rounded-full disabled:opacity-50 transition-colors"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        <button 
+                            onClick={() => onPageChange(currentPage + 1)}
+                            disabled={currentPage >= totalPages}
+                            className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-700 rounded-full disabled:opacity-50 transition-colors"
+                        >
+                            <ChevronRight size={20} />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -80,7 +110,8 @@ export function EmailList({ emails, onEmailClick, onToggleStar, onRefresh, searc
                                 onToggleStar={onToggleStar} 
                                 searchQuery={searchQuery}
                                 selected={selectedIds.includes(email.id)} 
-                                onToggleSelect={onToggleSelect}           
+                                onToggleSelect={onToggleSelect}
+                                onToggleRead={onToggleRead}
                             /> 
                         ))}
                     </div>
