@@ -9,7 +9,7 @@ import { Header } from "@/components/Header";
 import {EmailList} from "@/components/EmailList";
 import { EmailDetail } from "@/components/EmailDetail";
 import { AdminDashboard } from "@/components/AdminDashboard";
-import { Shield } from "lucide-react";
+import { Info } from "lucide-react";
 
 const getStarOverrides = () => {
   if (typeof window !== "undefined") {
@@ -58,6 +58,7 @@ export default function Home() {
   const [loading, setLoading] = useState(initialUser !== "");
   const [error, setError] = useState<string | null>(null);
   const [tempInput, setTempInput] = useState("");
+  const [inputInvalid, setInputInvalid] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -165,25 +166,32 @@ export default function Home() {
     }
   }, [currentUser, currentView, selectedEmail, showAdminPanel]);
   
+  const openInbox = (username: string) => {
+    const fullEmail = `${username}@mailhey.com`;
+    setCurrentUser(fullEmail);
+    setCurrentView("inbox");
+    window.history.pushState(null, "", `/${fullEmail}/inbox`);
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (tempInput.trim()) {
-      const input = tempInput.trim().toLowerCase();
+    const input = tempInput.trim().toLowerCase();
 
-      let cleanUsername = input.split("@")[0];
-      cleanUsername = cleanUsername.replace(/\.[a-z]{2,4}$/i, "");
-      cleanUsername = cleanUsername.replace(/[^a-z0-9]/g, "");
+    let cleanUsername = input.split("@")[0];
+    cleanUsername = cleanUsername.replace(/\.[a-z]{2,4}$/i, "");
+    cleanUsername = cleanUsername.replace(/[^a-z0-9]/g, "");
 
-      if (!cleanUsername) {
-        setTempInput("");
-        return;
-      }
-
-      const fullEmail = `${cleanUsername}@mailhey.com`;
-      setCurrentUser(fullEmail);
-      setCurrentView("inbox");
-      window.history.pushState(null, "", `/${fullEmail}/inbox`);
+    if (!cleanUsername) {
+      setInputInvalid(true);
+      return;
     }
+
+    setInputInvalid(false);
+    openInbox(cleanUsername);
+  };
+
+  const handleRandomInbox = () => {
+    openInbox(`guest${Math.random().toString(36).slice(2, 8)}`);
   };
 
   const handleFolderChange = (view: string) => {
@@ -293,7 +301,6 @@ export default function Home() {
   });
 
   const maxChars = 50;
-  const remainingChars = maxChars - tempInput.length;
 
   if (!currentUser) {
     if (showAdminPanel) {
@@ -326,47 +333,52 @@ export default function Home() {
 
     return (
       <div className="relative min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
-        <button
-            onClick={() => {
-                setShowAdminPanel(true);
-                window.history.pushState(null, "", "/admin");
-            }}
-            className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-colors shadow-sm border border-gray-200 dark:border-gray-700 text-sm font-medium z-50"
-        >
-            <Shield size={16} className="text-orange-500" />
-            Admin
-        </button>
-
         <div className="bg-white dark:bg-gray-800 p-10 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 w-full max-w-md">
           <div className="flex justify-center mb-6">
             <div className="text-[33px] font-bold tracking-tight text-indigo-600">
               mail<span className="text-gray-900 dark:text-white">hey</span>
             </div>
           </div>
-          <h1 className="text-xl text-center font-medium text-gray-900 dark:text-white mb-2">Sign in</h1>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 text-sm">to continue</p>
+          <h1 className="text-xl text-center font-medium text-gray-900 dark:text-white mb-2">Open any inbox</h1>
+          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 text-sm">Disposable inboxes. No signup. Type any name and read the mail sent to it.</p>
 
           <form onSubmit={handleLogin} className="space-y-1">
             <div className="relative">
              <input
                 type="text"
-                className="w-full px-4 py-3 rounded border border-gray-300 dark:border-gray-600 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition text-gray-900 dark:text-white dark:bg-gray-700 font-medium placeholder-gray-500"
-                placeholder="Email or phone"
+                aria-label="inbox name"
+                className={`w-full pl-4 pr-32 py-3 rounded border focus:ring-1 outline-none transition text-gray-900 dark:text-white dark:bg-gray-700 font-medium placeholder-gray-500 ${
+                  inputInvalid
+                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                    : "border-gray-300 dark:border-gray-600 focus:border-indigo-600 focus:ring-indigo-600"
+                }`}
+                placeholder="anything"
                 value={tempInput}
                 maxLength={maxChars}
                 onChange={(e) => {
-                    const sanitizedValue = e.target.value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9@.]/g, '').replace(/^[0-9]+/, '');    
+                    const sanitizedValue = e.target.value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9@.]/g, '').replace(/^[0-9]+/, '');
                     setTempInput(sanitizedValue);
+                    if (inputInvalid && sanitizedValue) setInputInvalid(false);
                 }}
                 autoFocus
               />
-            </div>
-            <div className="flex justify-between items-start mt-1">
-              <span></span>
-              <span className="text-xs text-gray-400">{remainingChars} characters remaining</span>
+              {!tempInput.includes('@') && (
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm select-none pointer-events-none">
+                  @mailhey.com
+                </span>
+              )}
             </div>
             <div className="flex justify-end items-center mt-6 pt-4">
-              <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded font-medium hover:bg-indigo-700 transition">Next</button>
+              <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded font-medium hover:bg-indigo-700 transition">Open inbox</button>
+            </div>
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={handleRandomInbox}
+                className="text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition"
+              >
+                or open a random inbox
+              </button>
             </div>
           </form>
         </div>
@@ -413,29 +425,39 @@ export default function Home() {
                 router.push(`/${username}/inbox/${emailId}`);
               }} 
             />
-          ) : selectedEmail ? (
-            <EmailDetail
-              email={selectedEmail}
-              currentUser={currentUser}
-              onBack={handleBackToInbox}
-              onToggleStar={handleToggleStar}
-              isLoading={isEmailLoading}
-            />
           ) : (
-           <EmailList
-              emails={displayedEmails}
-              onEmailClick={handleEmailClick}
-              onToggleStar={handleToggleStar}
-              onRefresh={() => fetchInbox(1)}
-              searchQuery={searchQuery}
-              selectedIds={selectedIds}
-              onToggleSelect={handleToggleSelect}
-              onSelectAll={handleSelectAll}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              onToggleRead={handleToggleRead}
-            />
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 py-2 mb-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200 text-sm shrink-0">
+                <Info size={16} className="shrink-0" />
+                <span>This inbox is public — anyone who knows the name can read it.</span>
+              </div>
+              <div className="flex-1 min-h-0">
+                {selectedEmail ? (
+                  <EmailDetail
+                    email={selectedEmail}
+                    currentUser={currentUser}
+                    onBack={handleBackToInbox}
+                    onToggleStar={handleToggleStar}
+                    isLoading={isEmailLoading}
+                  />
+                ) : (
+                  <EmailList
+                    emails={displayedEmails}
+                    onEmailClick={handleEmailClick}
+                    onToggleStar={handleToggleStar}
+                    onRefresh={() => fetchInbox(1)}
+                    searchQuery={searchQuery}
+                    selectedIds={selectedIds}
+                    onToggleSelect={handleToggleSelect}
+                    onSelectAll={handleSelectAll}
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    onToggleRead={handleToggleRead}
+                  />
+                )}
+              </div>
+            </div>
           )}
         </main>
       </div>

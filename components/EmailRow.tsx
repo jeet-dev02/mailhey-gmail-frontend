@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, Square, CheckSquare, Trash2, Mail, MailOpen } from "lucide-react"; 
+import { Star, Square, CheckSquare, Mail, MailOpen } from "lucide-react"; 
 import { Email } from "@/lib/types";
 
 interface EmailRowProps {
@@ -86,10 +86,7 @@ export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery =
                 </div>
 
                 <div className="hidden group-hover:flex items-center gap-2 pl-2 w-max bg-gray-50 dark:bg-gray-700 backdrop-blur-sm transition-colors" onClick={(e) => e.stopPropagation()}>
-                    <button className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-600 rounded-full transition-colors" title="Delete">
-                        <Trash2 size={18} className="text-[#444746] dark:text-gray-300" />
-                    </button>
-                    <button 
+                    <button
                         className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-600 rounded-full transition-colors" 
                         title={email.read ? "Mark as unread" : "Mark as read"}
                         onClick={(e) => {

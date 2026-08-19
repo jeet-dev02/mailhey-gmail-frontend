@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Trash2, Star, ChevronDown, Lock, FileJson, Code, Link as LinkIcon, Terminal, Paperclip, FileText, LayoutTemplate } from "lucide-react";
+import { ArrowLeft, Star, ChevronDown, Lock, FileJson, Code, Link as LinkIcon, Terminal, Paperclip, FileText, LayoutTemplate } from "lucide-react";
 import { Email } from "@/lib/types";
 import { analyzeEmailSecurity } from "@/lib/security";
 import { SecurityBanner } from "./SecurityBanner";
@@ -160,9 +160,6 @@ ${email.body_html || email.body}
                 </button>
                 <button onClick={() => onToggleStar(email.id)} className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-700 rounded-full transition-colors" title="Star">
                     <Star size={20} className={email.starred ? "fill-yellow-400 text-yellow-400" : "text-[#444746] dark:text-gray-300"} />
-                </button>
-                <button className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-700 rounded-full transition-colors" title="Delete">
-                    <Trash2 size={20} className="text-[#444746] dark:text-gray-300" />
                 </button>
             </div>
 

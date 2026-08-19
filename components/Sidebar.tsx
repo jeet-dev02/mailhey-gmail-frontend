@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, Star, Trash2, Menu } from "lucide-react";
+import { Inbox, Star, Menu } from "lucide-react";
 import { useState } from "react";
 
 interface SidebarProps {
@@ -103,13 +103,6 @@ export default function Sidebar({ isOpen, toggleSidebar, currentView, setCurrent
                     <div className="flex items-center gap-4">
                         <Star size={20} className="min-w-[20px]" />
                         {isOpen && <span className={currentView === 'starred' ? "font-semibold text-sm" : "font-medium text-sm"}>Starred</span>}
-                    </div>
-                </div>
-
-                <div className={getNavClass('trash')} onClick={() => setCurrentView('trash')}>
-                    <div className="flex items-center gap-4">
-                        <Trash2 size={20} className="min-w-[20px]" />
-                        {isOpen && <span className={currentView === 'trash' ? "font-semibold text-sm" : "font-medium text-sm"}>Trash</span>}
                     </div>
                 </div>
             </nav>
