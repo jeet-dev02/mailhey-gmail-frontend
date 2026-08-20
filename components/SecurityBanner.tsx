@@ -14,7 +14,7 @@ export function SecurityBanner({ assessment }: SecurityBannerProps) {
     const isCritical = assessment.status === "Critical Risk";
 
     return (
-        <div className={`mx-6 mt-4 p-4 rounded-xl border flex gap-3 shadow-sm transition-all ${
+        <div className={`mx-3 sm:mx-6 mt-4 p-3 sm:p-4 rounded-xl border flex gap-3 shadow-sm transition-all ${
             isCritical 
             ? "bg-red-50 border-red-200 text-red-900 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-200" 
             : "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-900/20 dark:border-amber-800/50 dark:text-amber-200"
@@ -25,7 +25,7 @@ export function SecurityBanner({ assessment }: SecurityBannerProps) {
                     : <AlertTriangle size={22} className="text-amber-600 dark:text-amber-500" />
                 }
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0 break-words">
                 <h3 className="text-sm font-bold mb-1.5 tracking-tight uppercase">
                     Security Warning: {assessment.status}
                 </h3>

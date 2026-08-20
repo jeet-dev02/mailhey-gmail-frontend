@@ -102,16 +102,29 @@ export async function fetchAllSystemEmails() {
     }
 }
 
-//  Function to hit your mark-read endpoint
-export async function toggleEmailReadStatus(emailId: string | number, currentReadStatus: boolean) {
+//  Function to hit your mark-read endpoint with an absolute state.
+//  Bulk actions need this: "Mark as read" over a mixed selection must set every
+//  message to read rather than flipping each one individually.
+//  Best-effort only: this endpoint currently answers 401, so read state is kept
+//  in localStorage by the caller. fetch() does not throw on a 4xx, so without the
+//  response.ok check below the rejection is invisible.
+export async function setEmailReadStatus(emailId: string | number, read: boolean) {
     try {
-        await fetch(`${API_BASE}/mark-read`, {
+        const response = await fetch(`${API_BASE}/mark-read`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // We flip the status: if it was read (true), we send false to mark unread
-            body: JSON.stringify({ id: emailId, read: !currentReadStatus })
+            body: JSON.stringify({ id: emailId, read })
         });
+
+        if (!response.ok) {
+            console.warn(`mark-read rejected for ${emailId}: ${response.status} ${response.statusText}`);
+        }
     } catch (error) {
         console.error("Error updating read status:", error);
     }
+}
+
+export async function toggleEmailReadStatus(emailId: string | number, currentReadStatus: boolean) {
+    // We flip the status: if it was read (true), we send false to mark unread
+    return setEmailReadStatus(emailId, !currentReadStatus);
 }

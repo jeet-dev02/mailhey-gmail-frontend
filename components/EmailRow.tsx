@@ -13,6 +13,9 @@ interface EmailRowProps {
     onToggleRead: (id: string) => void; 
 }
 
+// 44px minimum touch target on mobile, back to the compact icon button from sm up.
+const touchTargetClass = "flex h-11 w-11 shrink-0 items-center justify-center transition-colors sm:h-8 sm:w-8";
+
 export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery = "", onToggleSelect, onToggleRead }: EmailRowProps) {
     
     const highlightText = (text: string, highlight: string) => {
@@ -36,7 +39,7 @@ export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery =
                 }
                 onClick(email);
             }}
-            className={`group flex items-center gap-4 px-4 py-2.5 border-b border-gray-100 dark:border-gray-700 hover:shadow-md hover:z-10 relative cursor-pointer transition-all ${
+            className={`group flex items-center gap-1 px-1 py-1.5 sm:gap-4 sm:px-4 sm:py-2.5 border-b border-gray-100 dark:border-gray-700 hover:shadow-md hover:z-10 relative cursor-pointer transition-all ${
                 selected 
                 ? 'bg-[#C2E7FF] dark:bg-indigo-900/40 hover:bg-[#b5e0fe] dark:hover:bg-indigo-900/60' 
                 : email.read 
@@ -44,9 +47,10 @@ export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery =
                     : 'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700'
             }`}
         >
-            <div className="flex items-center gap-3 text-[#444746] dark:text-gray-400" onClick={(e) => e.stopPropagation()}> 
+            <div className="flex shrink-0 items-center gap-0 text-[#444746] dark:text-gray-400 sm:gap-3" onClick={(e) => e.stopPropagation()}> 
                 <button 
-                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-sm transition-colors"
+                    aria-label={selected ? "Deselect message" : "Select message"}
+                    className={`${touchTargetClass} rounded-sm hover:bg-gray-200 dark:hover:bg-gray-600`}
                     onClick={(e) => {
                         e.stopPropagation(); 
                         onToggleSelect(email.id);
@@ -60,7 +64,8 @@ export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery =
                 </button>
 
                 <button 
-                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
+                    aria-label={email.starred ? "Unstar message" : "Star message"}
+                    className={`${touchTargetClass} rounded-full hover:bg-gray-200 dark:hover:bg-gray-600`}
                     onClick={(e) => {
                         e.stopPropagation(); 
                         onToggleStar(email.id); 
@@ -70,22 +75,23 @@ export function EmailRow({ email, selected, onClick, onToggleStar, searchQuery =
                 </button>
             </div>
 
-            <div className="flex-1 flex items-center min-w-0">
-                <span className={`w-48 truncate text-[#1F1F1F] dark:text-gray-200 group-hover:text-[#001D35] dark:group-hover:text-white transition-colors ${email.read ? 'font-normal' : 'font-bold'}`}>
+            {/* Stacked sender/subject below sm — one line will not fit at 320px */}
+            <div className="flex-1 flex flex-col min-w-0 sm:flex-row sm:items-center">
+                <span className={`w-full truncate text-[#1F1F1F] dark:text-gray-200 group-hover:text-[#001D35] dark:group-hover:text-white transition-colors sm:w-48 sm:shrink-0 ${email.read ? 'font-normal' : 'font-bold'}`}>
                     {highlightText(email.sender, searchQuery)}
                 </span>
 
-                <div className="flex-1 flex max-w-full truncate text-[#444746] dark:text-gray-400 text-sm">
-                    <span className={`text-[#1F1F1F] dark:text-gray-200 mr-1 transition-colors ${email.read ? 'font-normal' : 'font-bold'}`}>
+                <div className="flex w-full min-w-0 sm:flex-1 sm:max-w-full sm:truncate text-[#444746] dark:text-gray-400 text-sm">
+                    <span className={`truncate text-[#1F1F1F] dark:text-gray-200 mr-1 transition-colors ${email.read ? 'font-normal' : 'font-bold'}`}>
                         {highlightText(email.subject, searchQuery)}
                     </span>
-                    <span className="mx-1 text-[#444746] dark:text-gray-500">-</span>
-                    <span className="truncate">
+                    <span className="mx-1 hidden text-[#444746] dark:text-gray-500 sm:inline">-</span>
+                    <span className="hidden truncate sm:inline">
                         {highlightText(email.body, searchQuery)}
                     </span>
                 </div>
 
-                <div className="hidden group-hover:flex items-center gap-2 pl-2 w-max bg-gray-50 dark:bg-gray-700 backdrop-blur-sm transition-colors" onClick={(e) => e.stopPropagation()}>
+                <div className="hidden sm:group-hover:flex items-center gap-2 pl-2 w-max bg-gray-50 dark:bg-gray-700 backdrop-blur-sm transition-colors" onClick={(e) => e.stopPropagation()}>
                     <button
                         className="p-2 hover:bg-[#E0E2E6] dark:hover:bg-gray-600 rounded-full transition-colors" 
                         title={email.read ? "Mark as unread" : "Mark as read"}
