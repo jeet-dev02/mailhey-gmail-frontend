@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { ShieldAlert, Loader2, Shield, Mail, RefreshCw, User, Lock } from "lucide-react";
 import { fetchAllSystemEmails } from "@/lib/api";
 import { Email } from "@/lib/types";
@@ -11,13 +11,14 @@ interface AdminDashboardProps {
 
 export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
     const [emails, setEmails] = useState<Email[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false); // Starts false to prevent UI flicker
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState("");
     
-    // Security State
-    const [isLocked, setIsLocked] = useState(true);
+    // Strict Zero Trust Security State
+    const [isLocked, setIsLocked] = useState(true); // Always defaults to locked on page load
     const [tokenInput, setTokenInput] = useState("");
+    const [activeToken, setActiveToken] = useState(""); // Only kept in volatile React state
     const [lockError, setLockError] = useState("");
 
     const loadSystemEmails = useCallback(async (token: string, showRefreshIndicator = false) => {
@@ -32,37 +33,30 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
             if (json && json.status === "success") {
                 setEmails(json.data);
                 setIsLocked(false);
-                sessionStorage.setItem('adminToken', token);
+                setActiveToken(token); // Save token temporarily for the "Refresh Stream" button
             } else {
-                setError("Failed to load system data from the live database.");
+                if (isLocked) setLockError("Failed to load system data from the live database.");
+                else setError("Failed to load system data from the live database.");
             }
         } catch (err: any) {
             console.error(err);
             if (err.message === '401') {
                 setLockError("Token rejected. Unauthorized.");
-                sessionStorage.removeItem('adminToken');
                 setIsLocked(true);
+                setActiveToken("");
             } else {
-                setError("Network error: Could not connect to the backend.");
+                if (isLocked) setLockError("Network error: Could not connect to the backend.");
+                else setError("Network error: Could not connect to the backend.");
             }
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
         }
-    }, []);
-
-    useEffect(() => {
-        const savedToken = sessionStorage.getItem('adminToken');
-        if (savedToken) {
-            loadSystemEmails(savedToken);
-        } else {
-            setIsLoading(false); 
-        }
-    }, [loadSystemEmails]);
+    }, [isLocked]);
 
     const handleLock = () => {
-        sessionStorage.removeItem('adminToken');
         setTokenInput('');
+        setActiveToken('');
         setEmails([]);
         setIsLocked(true);
     };
@@ -74,6 +68,7 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
         } catch { return ""; }
     };
 
+    // --- RENDER 1: STRICT LOCK SCREEN ---
     if (isLocked) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors items-center justify-center p-8 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -91,7 +86,7 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
                 >
                     <input
                         type="password"
-                        placeholder="Enter Admin Token"
+                        placeholder="Paste 32-bit Token Here"
                         value={tokenInput}
                         onChange={(e) => setTokenInput(e.target.value)}
                         className="border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -110,15 +105,7 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
         );
     }
 
-    if (isLoading) {
-        return (
-            <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors items-center justify-center text-[#444746] dark:text-gray-400 shadow-sm border border-gray-100 dark:border-gray-700">
-                <Loader2 size={32} className="animate-spin mb-4 text-indigo-600 dark:text-indigo-400" />
-                <p className="text-sm font-medium">Loading live global email stream...</p>
-            </div>
-        );
-    }
-
+    // --- RENDER 2: ERROR SCREEN (Inside Dashboard) ---
     if (error) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors items-center justify-center p-8 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -126,10 +113,7 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
                 <p className="text-[#1F1F1F] dark:text-gray-200 font-medium mb-4">{error}</p>
                 <div className="flex gap-4">
                     <button 
-                        onClick={() => {
-                            const token = sessionStorage.getItem('adminToken');
-                            if (token) loadSystemEmails(token);
-                        }} 
+                        onClick={() => loadSystemEmails(activeToken)} 
                         className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors text-sm font-medium"
                     >
                         Retry Connection
@@ -145,6 +129,7 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
         );
     }
 
+    // --- RENDER 3: SECURE DASHBOARD UI ---
     return (
         <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors shadow-sm border border-gray-100 dark:border-gray-700">
             <div className="px-6 pt-6 lg:px-10 lg:pt-8 shrink-0 border-b border-gray-100 dark:border-gray-700 pb-6 flex justify-between items-start">
@@ -165,10 +150,7 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
                         Lock
                     </button>
                     <button 
-                        onClick={() => {
-                            const token = sessionStorage.getItem('adminToken');
-                            if (token) loadSystemEmails(token, true);
-                        }}
+                        onClick={() => loadSystemEmails(activeToken, true)}
                         disabled={isRefreshing}
                         className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md transition-colors text-sm font-medium disabled:opacity-50"
                     >
@@ -184,7 +166,6 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
                         <div 
                             key={email.id}
                             onClick={() => {
-                                // Safely route based on recipient fallback
                                 const routeUsername = email.recipient ? email.recipient.split('@')[0] : 'unknown';
                                 onSelectEmail(routeUsername, email.id);
                             }}
@@ -192,7 +173,6 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
                         >
                             <div className="w-48 font-bold text-[#1F1F1F] dark:text-gray-200 text-sm truncate shrink-0 flex items-center gap-2">
                                 <User size={14} className="text-gray-400" />
-                                {/* Safely split the recipient string */}
                                 {email.recipient ? email.recipient.split('@')[0] : 'Unknown'}
                             </div>
 
@@ -201,7 +181,6 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
                                     {email.subject || '(No Subject)'}
                                 </span>
                                 <span className="text-[#444746] dark:text-gray-500 truncate">
-                                    {/* Safely check for body before parsing */}
                                     {email.body ? `- ${email.body.replace(/<[^>]*>?/gm, '')}` : ''}
                                 </span>
                             </div>
