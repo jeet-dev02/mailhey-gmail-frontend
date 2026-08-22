@@ -67,47 +67,28 @@ export async function fetchEmailDetail(emailId: string | number, inboxUsername: 
     }
 }
 
-export async function fetchAllSystemEmails() {
-    try {
-        const response = await fetch(`${API_BASE}/getallemails`, {
-             cache: "no-store" 
-        });
+export async function fetchAllSystemEmails(token: string) {
+  const response = await fetch('https://mailhey-jkcw.onrender.com/api/getallemails', {
+    method: 'GET',
+    headers: {
+      'x-admin-token': token,
+      'Content-Type': 'application/json',
+    },
+  });
 
-     
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Render Backend Error - Status: ${response.status} ${response.statusText}`);
-            console.error(`Render Error Details:`, errorText);
-            throw new Error(`Backend rejected request: ${response.status}`);
-        }
+  
+  if (response.status === 401) {
+    throw new Error('401');
+  }
 
-        const json = await response.json();
+  if (!response.ok) {
+    throw new Error('Failed to fetch global emails');
+  }
 
-        if (json && json.status === "success" && Array.isArray(json.data)) {
-            json.data = json.data.map((e: any) => ({
-                id: e.id || Math.random().toString(),
-                sender: e.from || e.sender || "System",
-                subject: e.subject || "(No Subject)",
-                body: e.body || e.text || e.content || e.snippet || "",
-                createdAt: e.createdAt || e.date_received || e.date || new Date().toISOString(),
-               username: e.recipient || e.to || e.username || "Unknown User"
-            }));
-        }
-
-        return json;
-
-    } catch (error) {
-        console.error("Error in fetchAllSystemEmails:", error);
-        throw error; 
-    }
+  return response.json();
 }
 
-//  Function to hit your mark-read endpoint with an absolute state.
-//  Bulk actions need this: "Mark as read" over a mixed selection must set every
-//  message to read rather than flipping each one individually.
-//  Best-effort only: this endpoint currently answers 401, so read state is kept
-//  in localStorage by the caller. fetch() does not throw on a 4xx, so without the
-//  response.ok check below the rejection is invisible.
+
 export async function setEmailReadStatus(emailId: string | number, read: boolean) {
     try {
         const response = await fetch(`${API_BASE}/mark-read`, {

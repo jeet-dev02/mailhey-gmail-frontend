@@ -207,7 +207,6 @@ export default function Home() {
     const input = tempInput.trim().toLowerCase();
 
     let cleanUsername = input.split("@")[0];
-    cleanUsername = cleanUsername.replace(/\.[a-z]{2,4}$/i, "");
     cleanUsername = cleanUsername.replace(/[^a-z0-9]/g, "");
 
     if (!cleanUsername) {
