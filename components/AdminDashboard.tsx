@@ -5,16 +5,12 @@ import { ShieldAlert, Loader2, Shield, Mail, RefreshCw, User, Lock } from "lucid
 import { fetchAllSystemEmails } from "@/lib/api";
 import { Email } from "@/lib/types";
 
-interface SystemEmail extends Email {
-    username: string;
-}
-
 interface AdminDashboardProps {
     onSelectEmail: (username: string, emailId: string) => void;
 }
 
 export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
-    const [emails, setEmails] = useState<SystemEmail[]>([]);
+    const [emails, setEmails] = useState<Email[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState("");
@@ -36,7 +32,7 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
             if (json && json.status === "success") {
                 setEmails(json.data);
                 setIsLocked(false);
-                sessionStorage.setItem('adminToken', token); // Save for this session
+                sessionStorage.setItem('adminToken', token);
             } else {
                 setError("Failed to load system data from the live database.");
             }
@@ -47,7 +43,7 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
                 sessionStorage.removeItem('adminToken');
                 setIsLocked(true);
             } else {
-                setError("Network error: Could not connect to the live Render/EC2 backend.");
+                setError("Network error: Could not connect to the backend.");
             }
         } finally {
             setIsLoading(false);
@@ -55,13 +51,12 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
         }
     }, []);
 
-    // Check for existing token on mount
     useEffect(() => {
         const savedToken = sessionStorage.getItem('adminToken');
         if (savedToken) {
             loadSystemEmails(savedToken);
         } else {
-            setIsLoading(false); // Stop loading spinner if we just need to show the lock screen
+            setIsLoading(false); 
         }
     }, [loadSystemEmails]);
 
@@ -79,7 +74,6 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
         } catch { return ""; }
     };
 
-    // --- RENDER 1: LOCK SCREEN ---
     if (isLocked) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors items-center justify-center p-8 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -116,7 +110,6 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
         );
     }
 
-    // --- RENDER 2: LOADING APP DATA ---
     if (isLoading) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors items-center justify-center text-[#444746] dark:text-gray-400 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -126,7 +119,6 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
         );
     }
 
-    // --- RENDER 3: ERROR SCREEN ---
     if (error) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors items-center justify-center p-8 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -153,10 +145,8 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
         );
     }
 
-    // --- RENDER 4: DASHBOARD UI ---
     return (
         <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden transition-colors shadow-sm border border-gray-100 dark:border-gray-700">
-            {/* Header */}
             <div className="px-6 pt-6 lg:px-10 lg:pt-8 shrink-0 border-b border-gray-100 dark:border-gray-700 pb-6 flex justify-between items-start">
                 <div>
                     <h2 className="text-2xl font-normal text-[#1F1F1F] dark:text-gray-100 mb-2 transition-colors flex items-center gap-3">
@@ -188,38 +178,39 @@ export function AdminDashboard({ onSelectEmail }: AdminDashboardProps) {
                 </div>
             </div>
 
-            {/* Flat Email List */}
             <div className="flex-1 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50">
                 <div className="flex flex-col">
                     {emails.map((email) => (
                         <div 
                             key={email.id}
-                            onClick={() => onSelectEmail(email.username, email.id)}
+                            onClick={() => {
+                                // Safely route based on recipient fallback
+                                const routeUsername = email.recipient ? email.recipient.split('@')[0] : 'unknown';
+                                onSelectEmail(routeUsername, email.id);
+                            }}
                             className="flex items-center gap-4 px-6 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700/80 cursor-pointer transition-colors group"
                         >
-                            {/* INBOX OWNER */}
                             <div className="w-48 font-bold text-[#1F1F1F] dark:text-gray-200 text-sm truncate shrink-0 flex items-center gap-2">
                                 <User size={14} className="text-gray-400" />
-                                {email.username.split('@')[0]}
+                                {/* Safely split the recipient string */}
+                                {email.recipient ? email.recipient.split('@')[0] : 'Unknown'}
                             </div>
 
-                            {/* SUBJECT & BODY PREVIEW */}
                             <div className="flex-1 flex items-center min-w-0 text-sm">
                                 <span className="font-semibold text-[#1F1F1F] dark:text-gray-200 truncate mr-2">
-                                    {email.subject}
+                                    {email.subject || '(No Subject)'}
                                 </span>
                                 <span className="text-[#444746] dark:text-gray-500 truncate">
-                                    - {email.body.replace(/<[^>]*>?/gm, '')}
+                                    {/* Safely check for body before parsing */}
+                                    {email.body ? `- ${email.body.replace(/<[^>]*>?/gm, '')}` : ''}
                                 </span>
                             </div>
 
-                            {/* SENDER BADGE */}
                             <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-semibold shrink-0 max-w-[200px] truncate" title={email.sender}>
                                 <Mail size={12} className="shrink-0" />
-                                <span className="truncate">{email.sender.replace(/<[^>]+>/g, '').trim()}</span>
+                                <span className="truncate">{email.sender ? email.sender.replace(/<[^>]+>/g, '').trim() : 'Unknown'}</span>
                             </div>
 
-                            {/* DATE */}
                             <div className="w-24 text-right text-xs text-[#444746] dark:text-gray-400 font-medium shrink-0">
                                 {formatShortDate(email.createdAt || email.created_at)}
                             </div>
